@@ -1,7 +1,7 @@
 #
 # Copyright 2020, 2021 by Jon Dart. All Rights Reserved.
 #
-NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra
+NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic
 
 ARCH_FLAGS = -mavx2 -mbmi2
 
@@ -12,9 +12,9 @@ NN_LIBS := -lstdc++ -lc -lm
 
 CFLAGS := $(CFLAGS) $(NNUE_FLAGS) $(ARCH_FLAGS) $(OPT)
 
-CPP = clang
+CPP = g++
 
-LD = clang
+LD = g++
 
 #LDFLAGS = -fuse-ld=gold
 

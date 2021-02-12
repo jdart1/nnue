@@ -19,7 +19,10 @@ public:
     virtual ~Accumulator() = default;
 
     static AccumulatorHalf getHalf(Color c, Color sideToMove) {
-      return (c==sideToMove) ? AccumulatorHalf::Lower : AccumulatorHalf::Upper;
+        // TBD direct enum compare not working?
+        int c1 = (c==White) ? 0 : 1;
+        int c2 = (sideToMove==White) ? 0 : 1;
+        return c1 == c2 ? AccumulatorHalf::Lower : AccumulatorHalf::Upper;
     }
 
     void init(const BiasType *data) {
@@ -72,11 +75,11 @@ public:
     }
 
     AccumulatorState getState(AccumulatorHalf half) const noexcept {
-        return _states[half];
+        return _states[half == AccumulatorHalf::Lower ? 0 : 1];
     }
 
     void setState(AccumulatorHalf half, AccumulatorState state) {
-        _states[half] = state;
+      _states[half == AccumulatorHalf::Lower ? 0 : 1] = state;
     }
 
     void setState(AccumulatorState state) {

@@ -4,26 +4,25 @@
 
 template <typename ChessInterface> class Evaluator {
   public:
-
-  template <Color kside>
-  static size_t getIndices(const ChessInterface &intf, IndexArray &out) {
+    template <Color kside>
+    static size_t getIndices(const ChessInterface &intf, IndexArray &out) {
         IndexArray::iterator it = out.begin();
         for (const std::pair<Square, Piece> &pair : intf) {
             const Square &sq = pair.first;
             const Piece &piece = pair.second;
             if (piece != WhiteKing && piece != BlackKing) {
-                *it++ = nnue::Network::getIndex<kside>(
-                        intf.kingSquare(kside), piece, sq);
+                *it++ = nnue::Network::getIndex<kside>(intf.kingSquare(kside),
+                                                       piece, sq);
             }
         }
-        *it = LAST_INDEX; 
-        return it-out.begin();
+        *it = LAST_INDEX;
+        return it - out.begin();
     }
 
     template <Color kside>
     static void getChangedIndices(const ChessInterface &intf, IndexArray &added,
-                             IndexArray &removed, size_t &added_count,
-                             size_t &removed_count) {
+                                  IndexArray &removed, size_t &added_count,
+                                  size_t &removed_count) {
         const Square kp = intf.kingSquare(kside);
         const DirtyState &ds = intf.getDirtyState();
         size_t i;
@@ -46,14 +45,6 @@ template <typename ChessInterface> class Evaluator {
                        IndexArray &removed, IndexArray &added) {
         // "source" is a position prior to the one for which we want
         // to get a NNUE eval ("target").
-        Network::AccumulatorType &accum = ciTarget.getAccumulator();
-        AccumulatorHalf sourceHalf =
-            Network::AccumulatorType::getHalf(c, ciSource.sideToMove());
-        AccumulatorHalf targetHalf =
-            Network::AccumulatorType::getHalf(c, ciTarget.sideToMove());
-        // copy from source to target
-        accum.copy_half(targetHalf, ciSource.getAccumulator(), sourceHalf);
-        // get the diffs
         size_t added_count = 0, removed_count = 0;
         ChessInterface ci(ciTarget);
         while (ci.hasPrevious()) {
@@ -77,10 +68,15 @@ template <typename ChessInterface> class Evaluator {
                                 ChessInterface &ciTarget, const Color c) {
         IndexArray added, removed;
         getIndexDiffs(ciSource, ciTarget, c, added, removed);
-        // update based on diffs
-        auto it = network.layers.begin();
+        // copy from source to target
+        AccumulatorHalf sourceHalf =
+            Network::AccumulatorType::getHalf(c, ciSource.sideToMove());
         AccumulatorHalf targetHalf =
             Network::AccumulatorType::getHalf(c, ciTarget.sideToMove());
+        ciTarget.getAccumulator().copy_half(
+            targetHalf, ciSource.getAccumulator(), sourceHalf);
+        // update based on diffs
+        auto it = network.layers.begin();
         ((Network::Layer1 *)*it)
             ->updateAccum(added, removed, targetHalf,
                           ciTarget.getAccumulator());
@@ -88,12 +84,20 @@ template <typename ChessInterface> class Evaluator {
                                            AccumulatorState::Computed);
     }
 
-    void updateAccum(const Network &network, const IndexArray &indices,
-                     const Color c, Color sideToMove,
-                     Network::AccumulatorType &accum) {
+    void updateAccum(const Network &network, const IndexArray &indices, Color c,
+                     Color sideToMove, Network::AccumulatorType &accum) {
         auto it = network.layers.begin();
-        nnue::AccumulatorHalf targetHalf =
-            nnue::Network::AccumulatorType::getHalf(c, sideToMove);
+        AccumulatorHalf targetHalf =
+            Network::AccumulatorType::getHalf(c, sideToMove);
+        if (targetHalf == AccumulatorHalf::Lower) std::cout << "lower";
+        else std::cout << "upper";
+        std::cout << std::endl;
+        for (auto idx : indices) {
+            if (idx == nnue::LAST_INDEX)
+                break;
+            std::cout << idx << ' ';
+        }
+        std::cout << std::endl;
         ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
         accum.setState(AccumulatorState::Computed);
     }

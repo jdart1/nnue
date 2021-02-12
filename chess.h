@@ -26,7 +26,7 @@ enum Piece {
   BlackKing = 14
 };
 
-static inline bool isKing(Piece p) {return (p & 0x3) == 6;}
+static inline bool isKing(Piece p) {return (int(p) & 0x3) == 6;}
 
 enum class MoveType {Normal, Castling, Promotion};
 

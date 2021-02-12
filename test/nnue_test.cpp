@@ -110,13 +110,15 @@ static const std::unordered_map<char, nnue::Piece> pieceMap = {
 // wrapper around nnue::HalfKp, sets up that class with some fixed parameters
 class HalfKp {
 public:
-  static constexpr size_t OutputSize = 64;
+  static constexpr size_t OutputSize = 256;
+
+  static constexpr size_t InputSize = 64 * (10 * 64 + 1);
 
   using OutputType = int16_t;
 
   // test propagation
   using Layer1 = nnue::HalfKp<uint8_t, int16_t, int16_t, int16_t,
-                              64 * (10 * 64 + 1), OutputSize>;
+                              InputSize, OutputSize>;
 
   using AccumulatorType = Layer1::AccumulatorType;
 
@@ -134,40 +136,24 @@ private:
   std::unique_ptr<Layer1> layer1;
 };
 
-static constexpr int16_t col1[HalfKp::OutputSize] = {
-    -153, 454,  -407, -397, -431, -257, -438, -276, 297,  -307, -326,
-    427,  -14,  251,  -29,  -186, -388, 194,  -428, 504,  283,  -24,
-    -25,  397,  374,  -166, -210, 99,   51,   415,  -311, 410,  358,
-    -206, -499, 439,  49,   -424, -349, -166, -219, -163, -251, 279,
-    -424, 233,  -418, -300, -85,  -334, -307, -314, 155,  180,  -428,
-    17,   -498, -126, -396, 65,   -223, -195, -36,  -377};
-
-static constexpr int16_t col2[HalfKp::OutputSize] = {
-    -53,  145,  -337, 232,  86,   311,  76,   -270, 199,  -417, 502,
-    -30,  334,  -174, 293,  -242, -448, -30,  -101, 434,  118,  325,
-    -418, -373, 124,  -316, 466,  -279, -23,  -89,  -471, 436,  -455,
-    -295, 156,  143,  -496, -279, 385,  215,  -184, 375,  -327, -361,
-    -311, 478,  -91,  -247, -64,  320,  -325, -458, 134,  -231, -318,
-    -254, -34,  -364, -21,  455,  60,   20,   379,  117};
-
-static constexpr int16_t col3[HalfKp::OutputSize] = {
-    23,   -252, 253,  256,  -378, -44,  -439, 509,  141,  -288, -313,
-    107,  133,  -48,  -469, -59,  140,  -414, -437, 421,  -220, -179,
-    -125, -72,  312,  -182, 500,  -179, -315, 105,  -454, 221,  366,
-    312,  -35,  500,  -244, 38,   497,  410,  262,  -328, 5,    -117,
-    137,  49,   337,  -235, 147,  412,  -326, 439,  -278, 62,   -145,
-    -478, 392,  -156, -145, -434, 461,  -86,  299,  315};
-
-static constexpr int16_t col4[HalfKp::OutputSize] = {
-    286,  -248, 303,  -18,  303,  289,  -120, 53,   473,  398, 449,  98,   -65,
-    274,  375,  -430, 174,  -462, -503, 408,  112,  -136, 443, -8,   220,  -214,
-    70,   170,  212,  -143, -27,  438,  122,  -235, -91,  -87, -458, 301,  478,
-    -497, 187,  415,  114,  -390, 177,  -23,  -308, -160, 27,  -299, -264, -373,
-    78,   -333, 132,  -214, -34,  -310, 468,  -334, 60,   -70, -407, -330};
+static int16_t col1[HalfKp::OutputSize];
+static int16_t col2[HalfKp::OutputSize];
+static int16_t col3[HalfKp::OutputSize];
+static int16_t col4[HalfKp::OutputSize];
 
 static int test_halfkp() {
   const std::string fen =
       "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
+
+  unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
+  std::mt19937 gen(seed1);
+  std::uniform_int_distribution<int16_t> dist(-1000, 1000);
+  for (size_t i = 0; i < HalfKp::OutputSize; i++) {
+      col1[i] = dist(gen);
+      col2[i] = dist(gen);
+      col3[i] = dist(gen);
+      col4[i] = dist(gen);
+  }
 
   std::unordered_set<nnue::IndexType> w_expected{4231, 4235, 3860, 4117, 3869, 3872,
                                           3937, 3878, 3944, 3882, 4075, 4398,
@@ -257,7 +243,6 @@ static int test_halfkp() {
 
 static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) 
 {
-    std::cout << "test_incr" << std::endl;
   int errs = 0;
 
   nnue::IndexArray bIndices,wIndices;
@@ -301,10 +286,6 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget)
 
   nnue::Network network;
 
-  // evaluate source accumulator (full evaluation)
-//  evaluator.updateAccum(network, wIndices, nnue::White, ciSource.sideToMove(), ciSource.getAccumulator());
-//  evaluator.updateAccum(network, bIndices, nnue::Black, ciSource.sideToMove(), ciSource.getAccumulator());
-
   // have Evaluator calculate index diffs
   nnue::IndexArray wRemoved, wAdded, bRemoved, bAdded;
   evaluator.getIndexDiffs(ciSource,ciTarget,nnue::White,wRemoved,wAdded);
@@ -337,9 +318,40 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget)
       std::cerr << "added list differs" << std::endl;
   }
 
-//  evaluator.updateAccumIncremental(network, ciSource, ciTtarget1, White);
-//  evaluator.updateAccumIncremental(network, ciSource, ciTtarget1, Black);
+  HalfKp halfKp;
 
+  HalfKp::AccumulatorType accum;
+
+  for (size_t i = 0; i < HalfKp::InputSize; i++) {
+      HalfKp::OutputType col[HalfKp::OutputSize];
+      for (size_t j = 0; j < HalfKp::OutputSize; j++) {
+          col[j] = (i+j) % 10 - 5;
+      }
+      halfKp.get()->setCol(i, col);
+  }
+
+  // Full evaluation of 1st layer for target position
+  std::cout << "updating accum for White" << std::endl;
+  evaluator.updateAccum(network,wIndices,nnue::White,ciTarget.sideToMove(),
+                        accum);
+  std::cout << "updating accum for Black" << std::endl;
+  evaluator.updateAccum(network,bIndices,nnue::Black,ciTarget.sideToMove(),
+                        accum);
+  
+  // Incremental evaluation of 1st layer, starting from source position  
+  evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::White);
+  evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::Black);
+
+  // Compare evals
+  const HalfKp::OutputType *p = ciTarget.getAccumulator().getOutput();
+  const HalfKp::OutputType *q = accum.getOutput();
+  int tmp = errs;
+  for (size_t i = 0; i < 2*HalfKp::OutputSize; i++) {
+      if (*p++ != *q++) {
+          ++errs;
+      }
+  }
+  if (errs-tmp > 0) std::cout << "incremental/regular eval mismatch" << std::endl;
   return errs;
 }
 
