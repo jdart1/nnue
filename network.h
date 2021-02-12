@@ -33,6 +33,8 @@ class Network {
     using ScaleAndClamper = ScaleAndClamp<int32_t, int8_t, 32>;
     using Clamper = Clamp<int16_t, int8_t, 512>;
 
+    static constexpr size_t BUFFER_SIZE = 1350;
+
     Network() {
         layers.push_back(new Layer1());
         layers.push_back(new Clamper(127));
@@ -41,10 +43,14 @@ class Network {
         layers.push_back(new Layer3());
         layers.push_back(new ScaleAndClamper(64, 127));
         layers.push_back(new Layer4());
-        _bufferSize = 0;
+#ifndef NDEBUG        
+        size_t bufferSize = 0;
         for (const auto &layer : layers) {
-            _bufferSize += layer->bufferSize();
+            bufferSize += layer->bufferSize();
         }
+        // verify const buffer size is sufficient
+        assert(bufferSize <= BUFFER_SIZE);
+#endif
     }
 
     virtual ~Network() {
@@ -55,7 +61,7 @@ class Network {
 
     // evaluate the net (layers past the first one)
     OutputType evaluate(const AccumulatorType &accum) {
-        std::byte buffer[_bufferSize];
+        std::byte buffer[BUFFER_SIZE];
         size_t offset = 0;
         bool first = true;
         std::byte *input = nullptr;
@@ -101,7 +107,6 @@ class Network {
 
   protected:
     std::vector<BaseLayer *> layers;
-    size_t _bufferSize;
 };
 
 inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
