@@ -142,7 +142,7 @@ static int16_t col3[HalfKp::OutputSize];
 static int16_t col4[HalfKp::OutputSize];
 
 static int test_halfkp() {
-  const std::string fen =
+    const std::string fen =
       "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
 
   unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
@@ -252,26 +252,20 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget)
   nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(ciSource, wIndices);
   nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(ciSource, bIndices);
   for (auto it = wIndices.begin(); it != wIndices.end() && *it != nnue::LAST_INDEX; it++) {
-      std::cout << *it << ' ';
       base.insert(*it);
   }
   for (auto it = bIndices.begin(); it != bIndices.end() && *it != nnue::LAST_INDEX; it++) {
-      std::cout << *it << ' ';
       base.insert(*it);
   }
-  std::cout << std::endl;
 
   nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(ciTarget, wIndices);
   nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(ciTarget, bIndices);
   for (auto it = wIndices.begin(); it != wIndices.end() && *it != nnue::LAST_INDEX; it++) {
-      std::cout << *it << ' ';
       target.insert(*it);
   }
   for (auto it = bIndices.begin(); it != bIndices.end() && *it != nnue::LAST_INDEX; it++) {
-      std::cout << *it << ' ';
       target.insert(*it);
   }
-  std::cout << std::endl;
 
   std::vector<nnue::IndexType> added(32), removed(32);
 
@@ -288,19 +282,29 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget)
 
   // have Evaluator calculate index diffs
   nnue::IndexArray wRemoved, wAdded, bRemoved, bAdded;
-  evaluator.getIndexDiffs(ciSource,ciTarget,nnue::White,wRemoved,wAdded);
-  evaluator.getIndexDiffs(ciSource,ciTarget,nnue::Black,bRemoved,bAdded);
+  size_t wAddedCount, wRemovedCount, bAddedCount, bRemovedCount;
+  evaluator.getIndexDiffs(ciSource,ciTarget,nnue::White,wAdded,wRemoved,wAddedCount,wRemovedCount);
+  evaluator.getIndexDiffs(ciSource,ciTarget,nnue::Black,bAdded,bRemoved,bAddedCount,bRemovedCount);
   
   // diffs
   std::set<nnue::IndexType> removedAll, addedAll;                            
-  for (auto it = wRemoved.begin(); it != wRemoved.end() && *it != nnue::LAST_INDEX; it++)
-      removedAll.insert(*it);
-  for (auto it = bRemoved.begin(); it != bRemoved.end() && *it != nnue::LAST_INDEX; it++)
-      removedAll.insert(*it);
-  for (auto it = wAdded.begin(); it != wAdded.end() && *it != nnue::LAST_INDEX; it++)
-      addedAll.insert(*it);
-  for (auto it = bAdded.begin(); it != bAdded.end() && *it != nnue::LAST_INDEX; it++)
-      addedAll.insert(*it);
+  for (size_t i = 0; i < wRemovedCount; i++)
+      removedAll.insert(wRemoved[i]);
+  for (size_t i = 0; i < bRemovedCount; i++)
+      removedAll.insert(bRemoved[i]);
+  for (size_t i = 0; i < wAddedCount; i++)
+      addedAll.insert(wAdded[i]);
+  for (size_t i = 0; i < bAddedCount; i++)
+      addedAll.insert(bAdded[i]);
+
+  std::vector<nnue::IndexType> intersect(32);
+  auto intersect_end = std::set_intersection(removedAll.begin(),removedAll.end(),addedAll.begin(),addedAll.end(),intersect.begin());
+  // diff algorithm may place items in both removed and added
+  // lists. Filter these out.
+  for (auto it = intersect.begin(); it != intersect_end; it++) {
+      addedAll.erase(*it);
+      removedAll.erase(*it);
+  }
 
   std::vector<nnue::IndexType> diffs(32);
   itend = std::set_difference(removedAll.begin(), removedAll.end(), removed.begin(),removed.end(), diffs.begin());
@@ -310,7 +314,6 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget)
       std::cerr << "removed list differs" << std::endl;
   }
   diffs.clear();
-  std::cout << std::endl;
   itend = std::set_difference(addedAll.begin(), addedAll.end(), added.begin(),added.end(), diffs.begin());
   diffs.resize(itend-diffs.begin());
   if (diffs.size() != 0) {
@@ -330,13 +333,20 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget)
       halfKp.get()->setCol(i, col);
   }
 
-  // Full evaluation of 1st layer for target position
-  std::cout << "updating accum for White" << std::endl;
+  // Full evaluation of 1st layer for source position
+  evaluator.updateAccum(network,wIndices,nnue::White,ciSource.sideToMove(),
+                        ciSource.getAccumulator());
+  evaluator.updateAccum(network,bIndices,nnue::Black,ciSource.sideToMove(),
+                        ciSource.getAccumulator());
+  
+  // Full evaluation of 1st layer for target position into "accum"
   evaluator.updateAccum(network,wIndices,nnue::White,ciTarget.sideToMove(),
                         accum);
-  std::cout << "updating accum for Black" << std::endl;
   evaluator.updateAccum(network,bIndices,nnue::Black,ciTarget.sideToMove(),
                         accum);
+
+  assert(ciTarget.getAccumulator().getState(nnue::AccumulatorHalf::Lower) == nnue::AccumulatorState::Empty);
+  assert(ciTarget.getAccumulator().getState(nnue::AccumulatorHalf::Upper) == nnue::AccumulatorState::Empty);
   
   // Incremental evaluation of 1st layer, starting from source position  
   evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::White);
@@ -360,7 +370,7 @@ static int test_incremental() {
 
   constexpr auto target_fen = "r1bqk2r/pp1n1ppp/2pbpn2/8/2pP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQkq -";
 
-  constexpr auto target_fen2 = "r1bqk2r/pp1n1ppp/2pbpn2/8/2BP4/2N1PN2/PPQ2PPP/R1B1K2R b KQkq -";
+  constexpr auto target2_fen = "r1bqk2r/pp1n1ppp/2pbpn2/8/2BP4/2N1PN2/PPQ2PPP/R1B1K2R b KQkq -";
 
   int errs = 0;
 
@@ -372,13 +382,29 @@ static int test_incremental() {
   ChessInterface ciTarget(&target_pos);
   // set up dirty status
   // d5 pawn x c4 pawn
-  source_pos.dirtyState.dirty[source_pos.dirtyState.dirty_num++] = nnue::DirtyDetails(35, 26, nnue::BlackPawn);
+  source_pos.dirtyState.dirty[source_pos.dirtyState.dirty_num++] = nnue::DirtyDetails(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn);
   source_pos.dirtyState.dirty[source_pos.dirtyState.dirty_num++] =
-      nnue::DirtyDetails(26, nnue::InvalidSquare, nnue::WhitePawn);
+      nnue::DirtyDetails(26 /*C4*/, nnue::InvalidSquare, nnue::WhitePawn);
   // connect target to previous position
   target_pos.previous = &source_pos;
   
   errs += test_incr(ciSource, ciTarget);
+
+  Position target2_pos(target2_fen);
+  ChessInterface ciTarget2(&target2_pos);
+
+  // Try a position 2 half-moves back
+  target_pos.dirtyState.dirty[target_pos.dirtyState.dirty_num++] = nnue::DirtyDetails(12 /*E2*/, 26 /*C4*/, nnue::WhiteBishop);
+  target_pos.dirtyState.dirty[target_pos.dirtyState.dirty_num++] =
+      nnue::DirtyDetails(26 /*C4*/, nnue::InvalidSquare, nnue::BlackPawn);
+
+  target2_pos.previous = &target_pos;
+
+  ciTarget.getAccumulator().setState(nnue::AccumulatorHalf::Lower,nnue::AccumulatorState::Empty);
+  ciTarget.getAccumulator().setState(nnue::AccumulatorHalf::Upper,nnue::AccumulatorState::Empty);
+
+  errs += test_incr(ciSource, ciTarget2);
+
   return errs;
 }
 

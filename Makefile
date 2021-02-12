@@ -1,7 +1,7 @@
 #
 # Copyright 2020, 2021 by Jon Dart. All Rights Reserved.
 #
-NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic
+NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra
 
 ARCH_FLAGS = -mavx2 -mbmi2
 

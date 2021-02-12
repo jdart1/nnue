@@ -12,7 +12,8 @@ Position::Position(const std::string &fen)
 {
     int parts = 0;
     nnue::Square sq(56);
-    for (auto it = fen.begin(); it != fen.end() && parts < 8; ++it) {
+    auto it = fen.begin();
+    for (; it != fen.end() && parts < 8; ++it) {
         nnue::Piece p = nnue::EmptyPiece;
         if (*it == '/') {
             ++parts;
@@ -36,6 +37,11 @@ Position::Position(const std::string &fen)
             break;
         }
     }
+    it++;
+    if (*it == 'b')
+        stm = nnue::Black;
+    else
+        stm = nnue::White;
 }
 
         

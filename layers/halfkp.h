@@ -29,16 +29,14 @@ public:
     }
 
     // Perform an incremental update
-    void updateAccum(const IndexArray &added, const IndexArray &removed, AccumulatorHalf half, AccumulatorType &output) {
-      for (auto it = removed.begin();
-	   it != removed.end() && (*it) != LAST_INDEX;
-	   it++) {
-	     output.sub_half(half, this->_weights[*it]);
+    void updateAccum(const IndexArray &added, const IndexArray &removed,
+                     size_t added_count, size_t removed_count,
+                     AccumulatorHalf half, AccumulatorType &output) {
+      for (size_t i = 0; i < added_count; i++) {
+	   output.add_half(half, this->_weights[added[i]]);
       }
-      for (auto it = added.begin();
-	   it != added.end() && (*it) != LAST_INDEX;
-	   it++) {
-	     output.add_half(half, this->_weights[*it]);
+      for (size_t i = 0; i < removed_count; i++) {
+	  output.sub_half(half, this->_weights[removed[i]]);
       }
     }
     

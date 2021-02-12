@@ -14,7 +14,9 @@ template <typename OutputType, typename WeightType, typename BiasType, size_t si
 class Accumulator
 {
 public:
-    Accumulator() = default;
+     Accumulator() {
+       _states[0] = _states[1] = AccumulatorState::Empty;
+     }
 
     virtual ~Accumulator() = default;
 

@@ -42,14 +42,14 @@ template <typename ChessInterface> class Evaluator {
 
     void getIndexDiffs(const ChessInterface &ciSource,
                        const ChessInterface &ciTarget, Color c,
-                       IndexArray &removed, IndexArray &added) {
+                       IndexArray &added, IndexArray &removed,
+                       size_t &added_count, size_t &removed_count) {
         // "source" is a position prior to the one for which we want
         // to get a NNUE eval ("target").
-        size_t added_count = 0, removed_count = 0;
+        added_count = removed_count = 0;
         ChessInterface ci(ciTarget);
         while (ci.hasPrevious()) {
             ci.previous();
-            // TBD correct side
             if (c == nnue::White)
                 getChangedIndices<nnue::White>(ci, added, removed, added_count,
                                                removed_count);
@@ -59,15 +59,15 @@ template <typename ChessInterface> class Evaluator {
             if (const_cast<const ChessInterface &>(ci) == ciSource)
                 break;
         }
-        added[added_count] = nnue::LAST_INDEX;
-        removed[removed_count] = nnue::LAST_INDEX;
     }
 
     void updateAccumIncremental(const Network &network,
                                 const ChessInterface &ciSource,
                                 ChessInterface &ciTarget, const Color c) {
         IndexArray added, removed;
-        getIndexDiffs(ciSource, ciTarget, c, added, removed);
+        size_t added_count, removed_count;
+        getIndexDiffs(ciSource, ciTarget, c, added, removed,
+                      added_count, removed_count);
         // copy from source to target
         AccumulatorHalf sourceHalf =
             Network::AccumulatorType::getHalf(c, ciSource.sideToMove());
@@ -78,31 +78,28 @@ template <typename ChessInterface> class Evaluator {
         // update based on diffs
         auto it = network.layers.begin();
         ((Network::Layer1 *)*it)
-            ->updateAccum(added, removed, targetHalf,
-                          ciTarget.getAccumulator());
+          ->updateAccum(added, removed, added_count, removed_count,
+                        targetHalf,
+                        ciTarget.getAccumulator());
         ciTarget.getAccumulator().setState(targetHalf,
                                            AccumulatorState::Computed);
     }
 
+    // Full evaluation of 1/2 of the accumulator for a specified color (c)
     void updateAccum(const Network &network, const IndexArray &indices, Color c,
                      Color sideToMove, Network::AccumulatorType &accum) {
         auto it = network.layers.begin();
         AccumulatorHalf targetHalf =
             Network::AccumulatorType::getHalf(c, sideToMove);
-        if (targetHalf == AccumulatorHalf::Lower) std::cout << "lower";
-        else std::cout << "upper";
-        std::cout << std::endl;
         for (auto idx : indices) {
             if (idx == nnue::LAST_INDEX)
                 break;
-            std::cout << idx << ' ';
         }
-        std::cout << std::endl;
         ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
         accum.setState(AccumulatorState::Computed);
     }
 
-    // update the accumulator based on a position (incrementally if possible)
+    // Update the accumulator based on a position (incrementally if possible)
     void updateAccum(const Network &network, ChessInterface &intf,
                      const Color c, Network::AccumulatorType &accum) {
         // see if incremental update is possible
