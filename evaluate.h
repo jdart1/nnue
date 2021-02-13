@@ -24,19 +24,19 @@ template <typename ChessInterface> class Evaluator {
                                   IndexArray &removed, size_t &added_count,
                                   size_t &removed_count) {
         const Square kp = intf.kingSquare(kside);
-        const DirtyState &ds = intf.getDirtyState();
+        const unsigned dn = intf.getDirtyNum();
         size_t i;
-        for (i = 0; i < ds.dirty_num; i++) {
-            const auto &dd = ds.dirty[i];
-            Piece piece = dd.piece;
+        for (i = 0; i < dn; i++) {
+            Piece piece;
+            Square from, to;
+            intf.getDirtyState(i, from, to, piece);
             if (isKing(piece))
                 continue;
-            if (dd.from != InvalidSquare)
+            if (from != InvalidSquare)
                 removed[removed_count++] =
-                    Network::getIndex<kside>(kp, piece, dd.from);
-            if (dd.to != InvalidSquare)
-                added[added_count++] =
-                    Network::getIndex<kside>(kp, piece, dd.to);
+                    Network::getIndex<kside>(kp, piece, from);
+            if (to != InvalidSquare)
+                added[added_count++] = Network::getIndex<kside>(kp, piece, to);
         }
     }
 
@@ -66,8 +66,8 @@ template <typename ChessInterface> class Evaluator {
                                 ChessInterface &ciTarget, const Color c) {
         IndexArray added, removed;
         size_t added_count, removed_count;
-        getIndexDiffs(ciSource, ciTarget, c, added, removed,
-                      added_count, removed_count);
+        getIndexDiffs(ciSource, ciTarget, c, added, removed, added_count,
+                      removed_count);
         // copy from source to target
         AccumulatorHalf sourceHalf =
             Network::AccumulatorType::getHalf(c, ciSource.sideToMove());
@@ -78,9 +78,8 @@ template <typename ChessInterface> class Evaluator {
         // update based on diffs
         auto it = network.layers.begin();
         ((Network::Layer1 *)*it)
-          ->updateAccum(added, removed, added_count, removed_count,
-                        targetHalf,
-                        ciTarget.getAccumulator());
+            ->updateAccum(added, removed, added_count, removed_count,
+                          targetHalf, ciTarget.getAccumulator());
         ciTarget.getAccumulator().setState(targetHalf,
                                            AccumulatorState::Computed);
     }
@@ -109,8 +108,12 @@ template <typename ChessInterface> class Evaluator {
             Network::AccumulatorType::getHalf(intf.sideToMove(), c);
         ChessInterface ci(intf);
         while (ci.getAccumulator().getState(half) == AccumulatorState::Empty) {
-            if (isKing(ci.getDirtyState().pieceMoved()) ||
-                (gain -= ci.getDirtyState().dirty_num + 1) < 0) {
+            unsigned dn = ci.getDirtyNum();
+            if (dn == 0)
+                break;
+            Square from, to;
+            Piece piece;
+            if (isKing(piece) || (gain -= dn + 1) < 0) {
                 // King was moved, can't incrementally update, or no
                 // gain fron incremental update
                 break;

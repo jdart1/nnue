@@ -30,30 +30,6 @@ static inline bool isKing(Piece p) {return p == WhiteKing || p == BlackKing;}
 
 enum class MoveType {Normal, Castling, Promotion};
 
-struct DirtyDetails 
-{
-    Square from, to;
-    Piece piece;
-
-  DirtyDetails() :
-  from(InvalidSquare),to(InvalidSquare),piece(EmptyPiece) {
-  }
-
-  DirtyDetails(Square f, Square t, Piece p) :
-  from(f),to(t),piece(p) {
-  }
-
-};
-
-struct DirtyState 
-{
-    std::array<DirtyDetails,3> dirty;
-    unsigned dirty_num;
-
-    DirtyState() : dirty_num(0) {
-    }
-};
-
 // foward declaration - may be defined with typedef
 //class Position;
 
