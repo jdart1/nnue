@@ -7,27 +7,32 @@
 
 // This class defines a linear transformation layer of the NNUE.
 //
-template <typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize, size_t outputSize, size_t alignment = DEFAULT_ALIGN>
-class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSize>
-{
-public:
+template <typename InputType, typename WeightType, typename BiasType,
+          typename OutputType, size_t inputSize, size_t outputSize,
+          size_t alignment = DEFAULT_ALIGN>
+class LinearLayer
+    : public TypedLayer<InputType, OutputType, inputSize, outputSize> {
+  public:
     LinearLayer() = default;
-    
+
     virtual ~LinearLayer() = default;
 
     // propagate data through the layer
-    virtual inline void doForward(const InputType * input, OutputType *output) const noexcept {
-        dotProduct(input,output);
+    virtual inline void doForward(const InputType *input,
+                                  OutputType *output) const noexcept {
+        dotProduct(input, output);
     }
 
-    inline void dotProduct(const InputType *input, OutputType *output) const noexcept {
+    inline void dotProduct(const InputType *input, OutputType *output) const
+        noexcept {
         // generic implementation
         for (size_t i = 0; i < outputSize; i++) {
             output[i] = static_cast<OutputType>(this->_biases[i]);
         }
         for (size_t i = 0; i < outputSize; i++) {
             for (size_t j = 0; j < inputSize; j++) {
-                output[i] += static_cast<OutputType>(input[j]*this->_weights[i][j]);
+                output[i] +=
+                    static_cast<OutputType>(input[j] * this->_weights[i][j]);
             }
         }
     }
@@ -56,9 +61,7 @@ public:
         return s;
     }
 
-    virtual const BiasType *getBiases() const noexcept {
-        return _biases;
-    }
+    virtual const BiasType *getBiases() const noexcept { return _biases; }
 
     virtual const WeightType *getCol(size_t row) const noexcept {
         return _weights[row];
@@ -66,13 +69,12 @@ public:
 
     virtual void setCol(size_t row, const WeightType *col) {
         for (size_t i = 0; i < inputSize; ++i)
-           _weights[row][i] = col[i];
+            _weights[row][i] = col[i];
     }
 
-private:
+  private:
     alignas(alignment) BiasType _biases[outputSize];
     alignas(alignment) WeightType _weights[outputSize][inputSize];
-
 };
-    
+
 #endif
