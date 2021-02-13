@@ -112,6 +112,7 @@ template <typename ChessInterface> class Evaluator {
             if (dn == 0)
                 break;
             Square from, to;
+            Piece piece;
             ci.getDirtyState(0,from,to,piece);
             if (isKing(piece) || (gain -= dn + 1) < 0) {
                 // King was moved, can't incrementally update, or no
