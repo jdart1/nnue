@@ -247,6 +247,21 @@ static int test_halfkp() {
     return errs;
 }
 
+static int accumCompare(const HalfKp::AccumulatorType &accum1,
+                        const HalfKp::AccumulatorType &accum2) {
+    const HalfKp::OutputType *p = accum1.getOutput();
+    const HalfKp::OutputType *q = accum2.getOutput();
+    int errs = 0;
+    for (size_t i = 0; i < 2 * HalfKp::OutputSize; i++) {
+        if (*p++ != *q++) {
+            ++errs;
+        }
+    }
+    if (errs)
+        std::cout << "incremental/regular eval mismatch" << std::endl;
+    return errs;
+}
+
 static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
     int errs = 0;
 
@@ -374,16 +389,19 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
     evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::Black);
 
     // Compare evals
-    const HalfKp::OutputType *p = ciTarget.getAccumulator().getOutput();
-    const HalfKp::OutputType *q = accum.getOutput();
-    int tmp = errs;
-    for (size_t i = 0; i < 2 * HalfKp::OutputSize; i++) {
-        if (*p++ != *q++) {
-            ++errs;
-        }
-    }
-    if (errs - tmp > 0)
-        std::cout << "incremental/regular eval mismatch" << std::endl;
+    errs += accumCompare(ciTarget.getAccumulator(), accum);
+
+    // Reset target accumulator state
+    ciTarget.getAccumulator().setEmpty();
+
+    // use the API that takes incremental or regular path
+    evaluator.updateAccum(network, ciTarget, nnue::White,
+                          ciTarget.getAccumulator());
+    evaluator.updateAccum(network, ciTarget, nnue::Black,
+                          ciTarget.getAccumulator());
+
+    // Compare results again
+    errs += accumCompare(ciTarget.getAccumulator(), accum);
     return errs;
 }
 
@@ -427,10 +445,7 @@ static int test_incremental() {
 
     target2_pos.previous = &target_pos;
 
-    ciTarget.getAccumulator().setState(nnue::AccumulatorHalf::Lower,
-                                       nnue::AccumulatorState::Empty);
-    ciTarget.getAccumulator().setState(nnue::AccumulatorHalf::Upper,
-                                       nnue::AccumulatorState::Empty);
+    ciTarget.getAccumulator().setEmpty();
 
     errs += test_incr(ciSource, ciTarget2);
 

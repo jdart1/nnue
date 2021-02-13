@@ -112,7 +112,7 @@ template <typename ChessInterface> class Evaluator {
             if (dn == 0)
                 break;
             Square from, to;
-            Piece piece;
+            ci.getDirtyState(0,from,to,piece);
             if (isKing(piece) || (gain -= dn + 1) < 0) {
                 // King was moved, can't incrementally update, or no
                 // gain fron incremental update
@@ -131,7 +131,10 @@ template <typename ChessInterface> class Evaluator {
         } else {
             // Do full update
             IndexArray indices;
-            getIndices<c>(intf, indices);
+            if (c == White)
+                getIndices<White>(intf, indices);
+            else
+                getIndices<Black>(intf, indices);
             auto it = network.layers.begin();
             ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
         }
