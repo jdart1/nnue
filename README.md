@@ -25,7 +25,7 @@ MIT Licensed.
 
 The Evaluator class is templated and assumes use of a class or typedef that provides a basic interface to a chess position.
 
-The interface subdirectory contains an implementation, named ChessInterface that provides the necessary methods and is used by the test code. Users are likely to want to replace this with a class that wraps whatever native position representation they have.
+The interface subdirectory contains an implementation named ChessInterface that provides the necessary methods and is used by the test code. Users are likely to want to replace this with a class that wraps whatever native position representation they have.
 
 ## Test code
 
