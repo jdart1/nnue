@@ -459,7 +459,7 @@ int main(int argc, char **argv) {
     errs += test_linear();
     errs += test_halfkp();
     errs += test_incremental();
-    std::cerr << errs << " errors(s)" << std::endl;
+    std::cerr << errs << " errors" << std::endl;
 
     std::string fname;
     for (int arg = 1; arg < argc; ++arg) {
