@@ -2,6 +2,8 @@
 #ifndef _UTIL_H
 #define _UTIL_H
 
+// Arasan uses stdendian, which defines the various swap functions as macros
+#ifndef _STDENDIAN_H_
 #ifdef _MSC_VER
 // assume little-endian
 static uint16_t bswap16(uint16_t x) { return (x); }
@@ -15,6 +17,7 @@ static uint64_t bswap64(uint64_t x) { return __builtin_bswap64(x); }
 static uint16_t bswap16(uint16_t x) { return (x); }
 static uint32_t bswap32(uint32_t x) { return (x); }
 static uint64_t bswap64(uint64_t x) { return (x); }
+#endif
 #endif
 
 template <typename T> 
