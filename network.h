@@ -124,10 +124,12 @@ inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
         s.setstate(std::ios::failbit);
         return s;
     }
-    std::string architecture;
-    architecture.reserve(size);
-    s.read(&architecture[0], size);
-    std::cout << architecture << std::endl << std::flush;
+    char c;
+    for (uint32_t i = 0; i < size; i++) {
+        if (!s.get(c)) break;
+        //        std::cout << char(c);
+    }
+    //    std::cout << std::endl;
     unsigned n = 0;
     for (auto layer : network.layers) {
         if (!s.good())
@@ -136,7 +138,8 @@ inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
         if (n < 2) {
             (void)read_little_endian<uint32_t>(s);
         }
-        std::cout << "reading layer " << n++ << std::endl << std::flush;
+        //        std::cout << "reading layer " << n << std::endl << std::flush;
+        ++n;
         (void)layer->read(s);
     }
 
