@@ -3,20 +3,31 @@
 #define _UTIL_H
 
 // Arasan uses stdendian, which defines the various swap functions as macros
-#ifndef _STDENDIAN_H_
+#ifdef _STDENDIAN_H_
+#if __BYTE_ORDER == __BIG_ENDIAN
+static uint16_t to_little_endian16(uint16_t x) { return bswap16(x); }
+static uint32_t to_little_endian32(uint32_t x) { return bswap32(x); }
+static uint64_t to_little_endian64(uint64_t x) { return bswap64(x); }
+#else
+static uint16_t to_little_endian16(uint16_t x) { return (x); }
+static uint32_t to_little_endian32(uint32_t x) { return (x); }
+static uint64_t to_little_endian64(uint64_t x) { return (x); }
+#endif
+#else
+// Somewhat less general endian support
 #ifdef _MSC_VER
 // assume little-endian
-static uint16_t bswap16(uint16_t x) { return (x); }
-static uint32_t bswap32(uint32_t x) { return (x); }
-static uint64_t bswap64(uint64_t x) { return (x); }
+static uint16_t to_little_endian16(uint16_t x) { return (x); }
+static uint32_t to_little_endian32(uint32_t x) { return (x); }
+static uint64_t to_little_endian64(uint64_t x) { return (x); }
 #elif __BYTE_ORDER == __BIG_ENDIAN
-static uint16_t bswap16(uint16_t x) { return __builtin_bswap16(x); }
-static uint32_t bswap32(uint32_t x) { return __builtin_bswap32(x); }
-static uint64_t bswap64(uint64_t x) { return __builtin_bswap64(x); }
+static uint16_t to_little_endian16(uint16_t x) { return __builtin_bswap16(x); }
+static uint32_t to_little_endian32(uint32_t x) { return __builtin_bswap32(x); }
+static uint64_t to_little_endian64(uint64_t x) { return __builtin_bswap64(x); }
 #else
-static uint16_t bswap16(uint16_t x) { return (x); }
-static uint32_t bswap32(uint32_t x) { return (x); }
-static uint64_t bswap64(uint64_t x) { return (x); }
+static uint16_t to_little_endian16(uint16_t x) { return (x); }
+static uint32_t to_little_endian32(uint32_t x) { return (x); }
+static uint64_t to_little_endian64(uint64_t x) { return (x); }
 #endif
 #endif
 
@@ -30,11 +41,11 @@ T read_little_endian(std::istream &s)
     case 1:
         return static_cast<T>(input);
     case 2: 
-        return static_cast<T>(bswap16(input));
+        return static_cast<T>(to_little_endian16(input));
     case 4: 
-        return static_cast<T>(bswap32(input));
+        return static_cast<T>(to_little_endian32(input));
     case 8: 
-        return static_cast<T>(bswap64(input));
+        return static_cast<T>(to_little_endian64(input));
     default:
         throw std::invalid_argument("unsupported size");
     }
