@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <array>
+#include <vector>
 #ifdef __cpp_lib_bitops
 #include <bit>
 #endif
