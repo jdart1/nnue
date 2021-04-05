@@ -40,10 +40,10 @@ template <typename ChessInterface> class Evaluator {
         }
     }
 
-    void getIndexDiffs(const ChessInterface &ciSource,
-                       const ChessInterface &ciTarget, Color c,
-                       IndexArray &added, IndexArray &removed,
-                       size_t &added_count, size_t &removed_count) {
+    static void getIndexDiffs(const ChessInterface &ciSource,
+                              const ChessInterface &ciTarget, Color c,
+                              IndexArray &added, IndexArray &removed,
+                              size_t &added_count, size_t &removed_count) {
         // "source" is a position prior to the one for which we want
         // to get a NNUE eval ("target").
         added_count = removed_count = 0;
@@ -61,9 +61,9 @@ template <typename ChessInterface> class Evaluator {
         }
     }
 
-    void updateAccumIncremental(const Network &network,
-                                const ChessInterface &ciSource,
-                                ChessInterface &ciTarget, const Color c) {
+    static void updateAccumIncremental(const Network &network,
+                                       const ChessInterface &ciSource,
+                                       ChessInterface &ciTarget, const Color c) {
         IndexArray added, removed;
         size_t added_count, removed_count;
         getIndexDiffs(ciSource, ciTarget, c, added, removed, added_count,
@@ -85,8 +85,8 @@ template <typename ChessInterface> class Evaluator {
     }
 
     // Full evaluation of 1/2 of the accumulator for a specified color (c)
-    void updateAccum(const Network &network, const IndexArray &indices, Color c,
-                     Color sideToMove, Network::AccumulatorType &accum) {
+    static void updateAccum(const Network &network, const IndexArray &indices, Color c,
+                            Color sideToMove, Network::AccumulatorType &accum) {
         auto it = network.layers.begin();
         AccumulatorHalf targetHalf =
             Network::AccumulatorType::getHalf(c, sideToMove);
@@ -99,8 +99,8 @@ template <typename ChessInterface> class Evaluator {
     }
 
     // Update the accumulator based on a position (incrementally if possible)
-    void updateAccum(const Network &network, ChessInterface &intf,
-                     const Color c, Network::AccumulatorType &accum) {
+    static void updateAccum(const Network &network, ChessInterface &intf,
+                            const Color c, Network::AccumulatorType &accum) {
         // see if incremental update is possible
         int gain = intf.pieceCount() - 2; // pieces minus Kings
         AccumulatorHalf half;
@@ -143,11 +143,30 @@ template <typename ChessInterface> class Evaluator {
     }
 
     // evaluate the net (full evaluation)
-    Network::OutputType fullEvaluate(const Network &network,
-                                     ChessInterface &intf) {
-        updateAccum(network, intf);
-        return network.evaluate(intf.getAccumulator());
+    static Network::OutputType fullEvaluate(const Network &network,
+                                            ChessInterface &intf) {
+        // Do not use the accumulator from intf, because we don't assume there's
+        // a valid Node pointer in it.
+        Network::AccumulatorType accum;
+        updateAccum(network, intf, accum);
+        return network.evaluate(accum);
     }
+
+private:
+    static void updateAccum(const Network &network, ChessInterface &intf, Network::AccumulatorType &accum) {
+        Color colors[] = {White, Black};
+        for (Color color : colors) {
+            IndexArray indices;
+            if (color == White)
+                getIndices<White>(intf, indices);
+            else
+                getIndices<Black>(intf, indices);
+            AccumulatorHalf targetHalf =
+              Network::AccumulatorType::getHalf(intf.sideToMove(), color);
+            reinterpret_cast<Network::Layer1 *>(*(network.layers.begin()))->updateAccum(indices, targetHalf, accum);
+        }
+    }
+
 };
 
 #endif

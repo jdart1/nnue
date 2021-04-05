@@ -60,7 +60,7 @@ class Network {
     }
 
     // evaluate the net (layers past the first one)
-    OutputType evaluate(const AccumulatorType &accum) {
+    OutputType evaluate(const AccumulatorType &accum) const {
         std::byte buffer[BUFFER_SIZE];
         size_t offset = 0;
         bool first = true;
