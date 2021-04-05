@@ -12,6 +12,7 @@
 // concepts, which are used if available.
 
 #include "nnue.h"
+#include <unordered_map>
 
 struct DirtyState {
     nnue::Square from, to;
