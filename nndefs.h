@@ -9,6 +9,9 @@ using IndexType = unsigned;
 
 static constexpr IndexType LAST_INDEX = 1000000;
 
+// Ration of NNUE output to chess evaluation
+static constexpr int FV_SCALE = 16;
+
 using IndexArray = std::array<IndexType,MAX_INDICES>;
 
 // version of the network (Stockfish compatible)

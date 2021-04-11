@@ -22,7 +22,7 @@ class Network {
     static constexpr size_t HalfKpOutputSize = 256;
 
     using IndexArray = std::array<int, MAX_INDICES>;
-    using OutputType = int8_t;
+    using OutputType = int32_t;
     using InputType = uint8_t; // output of transformer
     using Layer1 = HalfKp<uint16_t, int16_t, int16_t, int16_t, HalfKpRows,
                           HalfKpOutputSize>;
@@ -62,24 +62,21 @@ class Network {
     // evaluate the net (layers past the first one)
     OutputType evaluate(const AccumulatorType &accum) const {
         std::byte buffer[BUFFER_SIZE];
-        size_t offset = 0;
         bool first = true;
-        std::byte *input = nullptr;
         // propagate data through the remaining layers
-        for (auto it = layers.begin() + 1; it != layers.end(); it++) {
+        size_t inputOffset = 0, outputOffset = 0;
+        for (auto it = layers.begin() + 1; it != layers.end();
+             inputOffset = outputOffset, outputOffset += (*it++)->bufferSize()) {
             if (first) {
                 (*it)->forward(static_cast<const void *>(accum.getOutput()),
-                               static_cast<void *>(buffer + offset));
+                               static_cast<void *>(buffer + outputOffset));
                 first = false;
             } else {
-                (*it)->forward(static_cast<const void *>(input),
-                               static_cast<void *>(buffer + offset));
+                (*it)->forward(static_cast<const void *>(buffer + inputOffset),
+                               static_cast<void *>(buffer + outputOffset));
             }
-            input = buffer + offset;
-            offset += (*it)->bufferSize();
         }
-        return *(
-            (static_cast<OutputType *>(static_cast<void *>(buffer + offset))));
+        return (*(reinterpret_cast<OutputType*>(buffer + outputOffset - sizeof(OutputType))))/FV_SCALE;
     }
 
     friend std::istream &operator>>(std::istream &i, Network &);
