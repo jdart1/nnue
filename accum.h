@@ -90,6 +90,10 @@ class Accumulator {
         setState(AccumulatorHalf::Upper, AccumulatorState::Empty);
     }
 
+    size_t getSize() const noexcept {
+        return size;
+    }
+
   private:
     size_t offset(AccumulatorHalf half) const noexcept {
         return (half == AccumulatorHalf::Lower ? 0 : 1) * size / 2;
