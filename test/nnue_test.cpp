@@ -16,42 +16,46 @@
 
 // Unit tests for nnue code
 
+template<size_t ROWS, size_t COLS> 
 static int test_linear() {
     int errs = 0;
 
-    static constexpr size_t ROWS = 32, COLS = 32;
+    using InputType = uint8_t;
+    using WeightType = int8_t;
+    using BiasType = int32_t;
+    using OutputType = int32_t;
 
-    static int16_t biases[COLS];
-    static int16_t weights[ROWS][COLS];
-
-    using WeightType = int16_t;
-    using OutputType = int16_t;
+    static BiasType biases[COLS];
+    static WeightType weights[COLS][ROWS]; // indexed first by output
 
     unsigned seed1 =
         std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 gen(seed1);
-    std::uniform_int_distribution<int16_t> dist(-1000, 1000);
+    std::uniform_int_distribution<WeightType> dist(-127, 127);
 
-    constexpr size_t bufSize = COLS + ROWS * COLS;
-    auto buf = std::unique_ptr<int16_t[]>(new WeightType[bufSize]);
+    constexpr size_t bufSize = COLS*sizeof(BiasType)+ (ROWS * COLS)*sizeof(WeightType);
+    auto buf = std::unique_ptr<std::byte[]>(new std::byte[bufSize]);
 
-    int16_t *b = buf.get();
+    std::byte *b = buf.get();
+    BiasType *bb = reinterpret_cast<BiasType *>(b);
     for (size_t i = 0; i < COLS; i++) {
-        *b++ = biases[i] = dist(gen);
+        *bb++ = biases[i] = (BiasType)dist(gen);
     }
+    b += COLS*sizeof(BiasType);
+    WeightType *w = reinterpret_cast<WeightType*>(b);
     for (size_t i = 0; i < COLS; i++) {
         for (size_t j = 0; j < ROWS; j++) {
-            *b++ = weights[i][j] = dist(gen);
+            *w++ = weights[i][j] = dist(gen);
         }
     }
 
-    nnue::LinearLayer<int8_t, WeightType, WeightType, OutputType, 32, 32> layer;
+    nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS> layer;
 
     std::string tmp_name(std::tmpnam(nullptr));
 
     std::ofstream outfile(tmp_name, std::ios::binary);
     outfile.write(reinterpret_cast<char *>(buf.get()),
-                  bufSize * sizeof(int16_t));
+                  bufSize);
     outfile.close();
 
     std::ifstream infile(tmp_name, std::ios::binary);
@@ -80,20 +84,22 @@ static int test_linear() {
     if (errs - tmp > 0)
         std::cerr << "errors deserializing linear layer" << std::endl;
 
-    constexpr int8_t inputs[ROWS] = {0, 0, 0, 0, 8, 0,  0, 0, 0, 0, 0,
-                                     0, 0, 0, 0, 0, -8, 0, 0, 0, 0, 0,
-                                     0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
+    InputType inputs[ROWS];
+    for (unsigned i = 0; i < ROWS; i++) {
+        inputs[i] = static_cast<InputType>(i);
+    }
 
     OutputType output[COLS], computed[COLS];
 
     // test linear layer propagation
     layer.forward(inputs, output);
-    memcpy(computed, biases, sizeof(WeightType) * COLS);
+    memcpy(computed, biases, sizeof(BiasType) * COLS);
     for (size_t i = 0; i < COLS; i++) {
         for (size_t j = 0; j < ROWS; j++) {
             computed[i] += inputs[j] * weights[i][j];
         }
     }
+
     tmp = errs;
     for (size_t i = 0; i < COLS; i++) {
         errs += computed[i] != output[i];
@@ -456,7 +462,8 @@ int main(int argc, char **argv) {
     nnue::Network n;
 
     int errs = 0;
-    errs += test_linear();
+    errs += test_linear<32,32>();
+    errs += test_linear<32,1>();
     errs += test_halfkp();
     errs += test_incremental();
     std::cerr << errs << " errors" << std::endl;
