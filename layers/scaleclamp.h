@@ -4,8 +4,8 @@
 
 #include "typed.h"
 
-template <typename InputType, typename OutputType, size_t size>
-class ScaleAndClamp : public TypedLayer<InputType, OutputType, size, size> {
+template <typename InputType, typename OutputType, size_t size, size_t alignment = DEFAULT_ALIGN>
+class ScaleAndClamp : public TypedLayer<InputType, OutputType, size, size, alignment> {
   public:
     ScaleAndClamp(int scaleFactor, int clampMax)
         : _scaleFactor(scaleFactor), _clampMax(clampMax) {}

@@ -10,7 +10,7 @@
 
 template <typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
           size_t outputSize, size_t alignment = DEFAULT_ALIGN>
-class HalfKp : public TypedLayer<InputType, OutputType, inputSize, outputSize>
+class HalfKp : public TypedLayer<InputType, OutputType, inputSize, outputSize, alignment>
 {
 public:
     HalfKp() = default;

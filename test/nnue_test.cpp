@@ -16,7 +16,7 @@
 
 // Unit tests for nnue code
 
-template<size_t ROWS, size_t COLS> 
+template<size_t ROWS, size_t COLS>
 static int test_linear() {
     int errs = 0;
 
@@ -39,13 +39,14 @@ static int test_linear() {
     std::byte *b = buf.get();
     BiasType *bb = reinterpret_cast<BiasType *>(b);
     for (size_t i = 0; i < COLS; i++) {
-        *bb++ = biases[i] = (BiasType)dist(gen);
+        *bb++ = biases[i] = (i%15) + i - 10;
     }
     b += COLS*sizeof(BiasType);
     WeightType *w = reinterpret_cast<WeightType*>(b);
+    // serialized in column order
     for (size_t i = 0; i < COLS; i++) {
         for (size_t j = 0; j < ROWS; j++) {
-            *w++ = weights[i][j] = dist(gen);
+            *w++ = weights[i][j] = ((i+j) % 20) - 10;
         }
     }
 
@@ -73,30 +74,31 @@ static int test_linear() {
     int tmp = errs;
     for (size_t i = 0; i < COLS; i++) {
         errs += (layer.getBiases()[i] != biases[i]);
+    }
+    for (size_t i = 0; i < COLS; i++) {
+        // get weights for output column
         const WeightType *col = layer.getCol(i);
         for (size_t j = 0; j < ROWS; j++) {
             errs += (weights[i][j] != col[j]);
-            if (weights[i][j] != col[j])
-                std::cout << i << ' ' << j << ' ' << weights[i][j] << ' '
-                          << col[j] << std::endl;
         }
     }
     if (errs - tmp > 0)
         std::cerr << "errors deserializing linear layer" << std::endl;
 
-    InputType inputs[ROWS];
+    alignas(nnue::DEFAULT_ALIGN) InputType inputs[ROWS];
     for (unsigned i = 0; i < ROWS; i++) {
         inputs[i] = static_cast<InputType>(i);
     }
 
-    OutputType output[COLS], computed[COLS];
-
+    alignas(nnue::DEFAULT_ALIGN) OutputType output[COLS], computed[COLS];
     // test linear layer propagation
     layer.forward(inputs, output);
-    memcpy(computed, biases, sizeof(BiasType) * COLS);
     for (size_t i = 0; i < COLS; i++) {
-        for (size_t j = 0; j < ROWS; j++) {
-            computed[i] += inputs[j] * weights[i][j];
+        computed[i] = static_cast<OutputType>(biases[i]);
+    }
+    for (size_t i = 0; i < ROWS; i++) {
+        for (size_t j = 0; j < COLS; j++) {
+            computed[j] += inputs[i] * weights[j][i];
         }
     }
 
@@ -105,7 +107,7 @@ static int test_linear() {
         errs += computed[i] != output[i];
     }
     if (errs - tmp > 0)
-        std::cerr << "errors computing dot product" << std::endl;
+        std::cerr << "errors computing dot product " << ROWS << "x" << COLS << std::endl;
     return errs;
 }
 
@@ -462,6 +464,7 @@ int main(int argc, char **argv) {
     nnue::Network n;
 
     int errs = 0;
+    errs += test_linear<512,32>();
     errs += test_linear<32,32>();
     errs += test_linear<32,1>();
     errs += test_halfkp();

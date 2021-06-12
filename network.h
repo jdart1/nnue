@@ -27,13 +27,13 @@ class Network {
     using Layer1 = HalfKp<uint16_t, int16_t, int16_t, int16_t, HalfKpRows,
                           HalfKpOutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
-    using Layer2 = LinearLayer<int8_t, int8_t, int32_t, int32_t, 512, 32>;
-    using Layer3 = LinearLayer<int8_t, int8_t, int32_t, int32_t, 32, 32>;
-    using Layer4 = LinearLayer<int8_t, int8_t, int32_t, int32_t, 32, 1>;
-    using ScaleAndClamper = ScaleAndClamp<int32_t, int8_t, 32>;
-    using Clamper = Clamp<int16_t, int8_t, 512>;
+    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 512, 32>;
+    using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 32>;
+    using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
+    using ScaleAndClamper = ScaleAndClamp<int32_t, uint8_t, 32>;
+    using Clamper = Clamp<int16_t, uint8_t, 512>;
 
-    static constexpr size_t BUFFER_SIZE = 1350;
+    static constexpr size_t BUFFER_SIZE = 2048;
 
     Network() {
         layers.push_back(new Layer1());

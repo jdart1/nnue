@@ -10,8 +10,8 @@
 template <typename InputType, typename WeightType, typename BiasType,
           typename OutputType, size_t inputSize, size_t outputSize,
           size_t alignment = DEFAULT_ALIGN>
-class LinearLayer
-    : public TypedLayer<InputType, OutputType, inputSize, outputSize> {
+class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
+                                      outputSize, alignment> {
   public:
     LinearLayer() = default;
 
@@ -25,14 +25,25 @@ class LinearLayer
 
     inline void dotProduct(const InputType *input, OutputType *output) const
         noexcept {
-        // generic implementation
-        for (size_t i = 0; i < outputSize; i++) {
-            output[i] = static_cast<OutputType>(this->_biases[i]);
+#if defined(SIMD) && defined(AVX2)
+        if constexpr (outputSize == 1) { // output layer
+            simd::dotProduct32x1(input,_weights[0],_biases,output);
         }
-        for (size_t i = 0; i < outputSize; i++) {
-            for (size_t j = 0; j < inputSize; j++) {
-                output[i] +=
-                    static_cast<OutputType>(input[j] * this->_weights[i][j]);
+        else if constexpr (outputSize == 32) {
+            simd::dotProductnx32<inputSize,outputSize>(input,_weights,_biases,output);
+        }
+        else
+#endif
+        {
+            // generic implementation
+            for (size_t i = 0; i < outputSize; i++) {
+                output[i] = static_cast<OutputType>(this->_biases[i]);
+            }
+            for (size_t i = 0; i < outputSize; i++) {
+                for (size_t j = 0; j < inputSize; j++) {
+                    output[i] +=
+                        static_cast<OutputType>(input[j] * this->_weights[i][j]);
+                }
             }
         }
     }
@@ -63,13 +74,13 @@ class LinearLayer
 
     virtual const BiasType *getBiases() const noexcept { return _biases; }
 
-    virtual const WeightType *getCol(size_t row) const noexcept {
-        return _weights[row];
+    virtual const WeightType *getCol(size_t col) const noexcept {
+        return _weights[col];
     }
 
-    virtual void setCol(size_t row, const WeightType *col) {
+    virtual void setCol(size_t index, const WeightType *col) {
         for (size_t i = 0; i < inputSize; ++i)
-            _weights[row][i] = col[i];
+            _weights[index][i] = col[i];
     }
 
   private:

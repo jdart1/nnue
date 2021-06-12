@@ -15,10 +15,15 @@
 #include <bit>
 #endif
 
+#ifdef SIMD
+#include "simd.h"
+#endif
+
 namespace nnue 
 {
 #include "network.h"
 #include "evaluate.h"
 }
+
 
 #endif
