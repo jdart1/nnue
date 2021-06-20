@@ -17,7 +17,7 @@ MIT Licensed.
 
 ## Missing Features
 
-- no special SIMD optimizations
+- limited SIMD optimizations (not complete yet, assumes at least AVX2)
 - read only, no support for writing network files
 - does not validate hash codes from existing network files
 
