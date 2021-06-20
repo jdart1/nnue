@@ -61,7 +61,7 @@ class Network {
 
     // evaluate the net (layers past the first one)
     OutputType evaluate(const AccumulatorType &accum) const {
-        std::byte buffer[BUFFER_SIZE];
+        alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
         bool first = true;
         // propagate data through the remaining layers
         size_t inputOffset = 0, outputOffset = 0;
