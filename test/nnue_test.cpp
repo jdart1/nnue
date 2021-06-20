@@ -128,7 +128,7 @@ class HalfKp {
 
     // test propagation
     using Layer1 =
-        nnue::HalfKp<uint8_t, int16_t, int16_t, int16_t, InputSize, OutputSize>;
+        nnue::HalfKp<uint16_t, int16_t, int16_t, int16_t, InputSize, OutputSize>;
 
     using AccumulatorType = Layer1::AccumulatorType;
 

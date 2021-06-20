@@ -27,6 +27,8 @@ inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_BADC));
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_CDAB));
     *output = _mm_cvtsi128_si32(sum128) + biases[0];
+#else
+#error SIMD support requires AVX2
 #endif
 }
 
@@ -56,6 +58,35 @@ inline void dotProductnx32(const uint8_t *input,
         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
         output[i] += _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
     }
+#else
+#error SIMD support requires AVX2
+#endif
+}
+
+template <size_t size, typename InType, typename OutType>
+inline void vec_add(const InType *in,OutType *out) {
+    const __m256i *inp = reinterpret_cast<const __m256i *>(in);
+    __m256i *outp = reinterpret_cast<__m256i *>(out);
+#ifdef AVX2
+    for (size_t i = 0; i < (size*8*sizeof(OutType))/simdWidth; ++i) {
+        outp[i] = _mm256_add_epi16(outp[i], inp[i]);
+    }
+#else
+#error SIMD support requires AVX2
+#endif
+}
+
+
+template <size_t size, typename InType, typename OutType>
+inline void vec_sub(const InType *in,OutType *out) {
+    const __m256i *inp = reinterpret_cast<const __m256i *>(in);
+    __m256i *outp = reinterpret_cast<__m256i *>(out);
+#ifdef AVX2
+    for (size_t i = 0; i < (size*8*sizeof(OutType))/simdWidth; ++i) {
+        outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
+    }
+#else
+#error SIMD support requires AVX2
 #endif
 }
 

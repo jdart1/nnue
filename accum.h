@@ -55,6 +55,12 @@ class Accumulator {
     void add_half(AccumulatorHalf half, const WeightType *data) {
         const OutputType *in = data;
         OutputType *out = _accum + offset(half);
+#ifdef SIMD
+        if constexpr (size*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
+            simd::vec_add<size/2,WeightType,OutputType>(in,out);
+        }
+        else
+#endif
         for (size_t i = 0; i < size / 2; ++i) {
             *out++ += static_cast<OutputType>(*in++);
         }
@@ -64,6 +70,12 @@ class Accumulator {
     void sub_half(AccumulatorHalf half, const WeightType *data) {
         const OutputType *in = data;
         OutputType *out = _accum + offset(half);
+#ifdef SIMD
+        if constexpr (size*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
+            simd::vec_sub<size/2,WeightType,OutputType>(in,out);
+        }
+        else
+#endif
         for (size_t i = 0; i < size / 2; ++i) {
             *out++ -= static_cast<OutputType>(*in++);
         }
