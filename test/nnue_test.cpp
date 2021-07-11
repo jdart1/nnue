@@ -460,6 +460,59 @@ static int test_incremental() {
     return errs;
 }
 
+static int test_clamp() {
+    int errs = 0;
+    using InputType = int16_t;
+    using OutputType = uint8_t;
+    constexpr unsigned SIZE = 512;
+    constexpr uint8_t CLAMP_MAX = 127;
+    using Clamper = nnue::Clamp<InputType, OutputType, SIZE>;
+
+    alignas(nnue::DEFAULT_ALIGN) InputType input[SIZE];
+    alignas(nnue::DEFAULT_ALIGN) OutputType output[SIZE],output2[SIZE];
+
+    Clamper c(CLAMP_MAX);
+
+    for (unsigned i = 0; i < SIZE; i++) {
+        input[i] = (i%20)-10 + (i%5)*30;
+        output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i],0,static_cast<InputType>(CLAMP_MAX)));
+    }
+    std::memset(output2,'\0',SIZE*sizeof(OutputType));
+    c.doForward(input,output2);
+    for (unsigned i = 0; i < SIZE; i++) {
+        errs += output2[i] != output[i];
+    }
+    if (errs) std::cerr << errs << " error(s) in clamp function" << std::endl;
+    return errs;
+}
+
+static int test_scale_and_clamp() {
+    int errs = 0;
+    constexpr unsigned SIZE = 32;
+    constexpr int CLAMP_MAX = 127;
+    constexpr int SCALE = 64;
+    using InputType = int32_t;
+    using OutputType = uint8_t;
+    using ScaleAndClamper = nnue::ScaleAndClamp<InputType, OutputType, SIZE>;
+
+    alignas(nnue::DEFAULT_ALIGN) InputType input[SIZE];
+    alignas(nnue::DEFAULT_ALIGN) OutputType output[SIZE],output2[SIZE];
+
+    ScaleAndClamper c(SCALE,CLAMP_MAX);
+
+    for (unsigned i = 0; i < SIZE; i++) {
+        input[i] = (i%20)-10 + (i%5)*1024;
+        output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i]/SCALE,0,CLAMP_MAX));
+    }
+    std::memset(output2,'\0',SIZE*sizeof(OutputType));
+    c.doForward(input,output2);
+    for (unsigned i = 0; i < SIZE; i++) {
+        errs += output2[i] != output[i];
+    }
+    if (errs) std::cerr << errs << " error(s) in scale and clamp function" << std::endl;
+    return errs;
+}
+
 int main(int argc, char **argv) {
     nnue::Network n;
 
@@ -469,6 +522,8 @@ int main(int argc, char **argv) {
     errs += test_linear<32,1>();
     errs += test_halfkp();
     errs += test_incremental();
+    errs += test_clamp();
+    errs += test_scale_and_clamp();
     std::cerr << errs << " errors" << std::endl;
 
     std::string fname;

@@ -25,7 +25,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
 
     inline void dotProduct(const InputType *input, OutputType *output) const
         noexcept {
-#if defined(SIMD) && defined(AVX2)
+#ifdef SIMD
         if constexpr (outputSize == 1) { // output layer
             simd::dotProduct32x1(input,_weights[0],_biases,output);
         }

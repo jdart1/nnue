@@ -4,8 +4,10 @@
 
 #include "typed.h"
 
-template <typename InputType, typename OutputType, size_t size, size_t alignment = DEFAULT_ALIGN>
-class ScaleAndClamp : public TypedLayer<InputType, OutputType, size, size, alignment> {
+template <typename InputType, typename OutputType, size_t size,
+          size_t alignment = DEFAULT_ALIGN>
+class ScaleAndClamp
+    : public TypedLayer<InputType, OutputType, size, size, alignment> {
   public:
     ScaleAndClamp(int scaleFactor, int clampMax)
         : _scaleFactor(scaleFactor), _clampMax(clampMax) {}
@@ -14,10 +16,17 @@ class ScaleAndClamp : public TypedLayer<InputType, OutputType, size, size, align
 
     virtual void doForward(const InputType *input, OutputType *output) const
         noexcept {
+#ifdef SIMD
+        // TBD assume fixed scale factor
+        assert(_scaleFactor == 64);
+        simd::scale_and_clamp<size, InputType, OutputType>(input, output, 6,
+                                                           _clampMax);
+#else
         for (size_t i = 0; i < size; i++) {
-            *output++ = static_cast<OutputType>(std::clamp(
-                static_cast<int>(input[i] / _scaleFactor), 0, _clampMax));
+            *output++ = static_cast<OutputType>(
+                std::clamp<InputType>(input[i] / _scaleFactor, 0, _clampMax));
         }
+#endif
     }
 
   protected:
