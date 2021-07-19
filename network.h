@@ -12,11 +12,9 @@
 
 class Network {
 
-  template<typename ChessInterface>
-  friend class Evaluator;
+    template <typename ChessInterface> friend class Evaluator;
 
   public:
-
     static constexpr size_t HalfKpRows = 64 * (10 * 64 + 1);
 
     static constexpr size_t HalfKpOutputSize = 256;
@@ -43,7 +41,7 @@ class Network {
         layers.push_back(new Layer3());
         layers.push_back(new ScaleAndClamper(64, 127));
         layers.push_back(new Layer4());
-#ifndef NDEBUG        
+#ifndef NDEBUG
         size_t bufferSize = 0;
         for (const auto &layer : layers) {
             bufferSize += layer->bufferSize();
@@ -64,9 +62,24 @@ class Network {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
         bool first = true;
         // propagate data through the remaining layers
-        size_t inputOffset = 0, outputOffset = 0;
+        size_t inputOffset = 0, outputOffset = 0, lastOffset = 0;
+#ifdef NNUE_TRACE
+        unsigned i = 0, layer = 0;
+        std::cout << "accumulator:" << std::endl;
+        for (i = 0; i < accum.getSize(); i++) {
+            std::cout << int(accum.getOutput()[i]) << ' ';
+        }
+        std::cout << std::endl;
+#endif
         for (auto it = layers.begin() + 1; it != layers.end();
-             inputOffset = outputOffset, outputOffset += (*it++)->bufferSize()) {
+             inputOffset = outputOffset, lastOffset = outputOffset,
+                  outputOffset += (*it++)->bufferSize()) {
+#ifdef NNUE_TRACE
+            std::cout << "--- layer " << layer + 1 << " input=" << std::hex
+                      << uintptr_t(buffer + inputOffset)
+                      << " output=" << uintptr_t(buffer + outputOffset)
+                      << std::dec << std::endl;
+#endif
             if (first) {
                 (*it)->forward(static_cast<const void *>(accum.getOutput()),
                                static_cast<void *>(buffer + outputOffset));
@@ -75,8 +88,26 @@ class Network {
                 (*it)->forward(static_cast<const void *>(buffer + inputOffset),
                                static_cast<void *>(buffer + outputOffset));
             }
+#ifdef NNUE_TRACE
+            if (layer % 2 == 0) {
+                for (i = 0; i < (*it)->bufferSize(); i++) {
+                    std::cout << int((reinterpret_cast<uint8_t *>(
+                                     buffer + outputOffset))[0])
+                              << ' ';
+                }
+                std::cout << std::endl;
+            }
+            ++layer;
+#endif
         }
-        return (*(reinterpret_cast<OutputType*>(buffer + outputOffset - sizeof(OutputType))))/FV_SCALE;
+#ifdef NNUE_TRACE
+        std::cout << "output: "
+                  << reinterpret_cast<OutputType *>(buffer + lastOffset)[0] /
+                         FV_SCALE
+                  << std::endl;
+#endif
+        return reinterpret_cast<OutputType *>(buffer + lastOffset)[0] /
+               FV_SCALE;
     }
 
     friend std::istream &operator>>(std::istream &i, Network &);
@@ -123,7 +154,8 @@ inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
     }
     char c;
     for (uint32_t i = 0; i < size; i++) {
-        if (!s.get(c)) break;
+        if (!s.get(c))
+            break;
         //        std::cout << char(c);
     }
     //    std::cout << std::endl;

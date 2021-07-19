@@ -139,7 +139,7 @@ template <typename ChessInterface> class Evaluator {
             auto it = network.layers.begin();
             ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
         }
-        accum.setState(AccumulatorState::Computed);
+        accum.setState(targetHalf,AccumulatorState::Computed);
     }
 
     // evaluate the net (full evaluation)
