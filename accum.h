@@ -27,6 +27,12 @@ class Accumulator {
 
     void init(const BiasType *data) {
         OutputType *out = _accum;
+#ifdef SIMD
+        if constexpr (size*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
+            simd::vec_copy<size,OutputType>(data,out);
+        }
+        else
+#endif
         for (size_t i = 0; i < size; ++i) {
             *out++ = *data++;
         }
@@ -35,6 +41,12 @@ class Accumulator {
     void init_half(AccumulatorHalf half, const BiasType *data) {
         const OutputType *in = data;
         OutputType *out = _accum + offset(half);
+#ifdef SIMD
+        if constexpr ((size/2)*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
+            simd::vec_copy<size/2,OutputType>(in,out);
+        }
+        else
+#endif
         for (size_t i = 0; i < size / 2; ++i) {
             *out++ = static_cast<OutputType>(*in++);
         }
@@ -46,6 +58,12 @@ class Accumulator {
                    AccumulatorHalf sourceHalf) {
         const OutputType *in = source._accum + offset(sourceHalf);
         OutputType *out = _accum + offset(half);
+#ifdef SIMD
+        if constexpr ((size/2)*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
+            simd::vec_copy<size/2,OutputType>(in,out);
+        }
+        else
+#endif
         for (size_t i = 0; i < size / 2; ++i) {
             *out++ = static_cast<OutputType>(*in++);
         }
@@ -56,7 +74,7 @@ class Accumulator {
         const OutputType *in = data;
         OutputType *out = _accum + offset(half);
 #ifdef SIMD
-        if constexpr (size*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
+        if constexpr ((size/2)*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
             simd::vec_add<size/2,WeightType,OutputType>(in,out);
         }
         else
@@ -71,7 +89,7 @@ class Accumulator {
         const OutputType *in = data;
         OutputType *out = _accum + offset(half);
 #ifdef SIMD
-        if constexpr (size*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
+        if constexpr ((size/2)*16 % simd::simdWidth == 0 && sizeof(WeightType) == sizeof(OutputType) && sizeof(WeightType)==2) {
             simd::vec_sub<size/2,WeightType,OutputType>(in,out);
         }
         else

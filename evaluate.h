@@ -2,6 +2,8 @@
 #ifndef _NNUE_EVALUATE_H
 #define _NNUE_EVALUATE_H
 
+//#define VALIDATE
+
 template <typename ChessInterface> class Evaluator {
   public:
     template <Color kside>
@@ -129,6 +131,23 @@ template <typename ChessInterface> class Evaluator {
         if (ci.getAccumulator().getState(half) == AccumulatorState::Computed) {
             // a previous position was found with usable data
             updateAccumIncremental(network, ci, intf, c);
+#ifdef VALIDATE
+            constexpr size_t halfSize = Network::HalfKpOutputSize;
+            Network::AccumulatorOutputType incr[halfSize];
+            std::memcpy(incr,intf.getAccumulator().getOutput(targetHalf),halfSize*sizeof(Network::AccumulatorOutputType));
+            // Do full update
+            IndexArray indices;
+            if (c == White)
+                getIndices<White>(intf, indices);
+            else
+                getIndices<Black>(intf, indices);
+            auto it = network.layers.begin();
+            ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
+            for (unsigned i = 0; i < halfSize; ++i) {
+                assert(accum.getOutput(targetHalf)[i] == incr[i]);
+            }
+            
+#endif            
         } else {
             // Do full update
             IndexArray indices;

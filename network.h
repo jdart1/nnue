@@ -25,6 +25,7 @@ class Network {
     using Layer1 = HalfKp<uint16_t, int16_t, int16_t, int16_t, HalfKpRows,
                           HalfKpOutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
+    using AccumulatorOutputType = int16_t;
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 512, 32>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;

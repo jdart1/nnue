@@ -13,9 +13,9 @@ static const __m256i ones256 = _mm256_set1_epi16(1);
 
 inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
                            const int32_t *biases, int32_t *output) {
+#ifdef AVX2
     const __m256i *iv = reinterpret_cast<const __m256i *>(input);
     const __m256i *row = reinterpret_cast<const __m256i *>(weights);
-#ifdef AVX2
 #ifdef VNNI
     __m256i prod = _mm256_dpbusd_epi32(_mm256_setzero_si256(), iv[0], row[0]);
 #else
@@ -62,6 +62,19 @@ inline void dotProductnx32(const uint8_t *input,
 #endif
 }
 
+template <size_t size, typename DataType>
+inline void vec_copy(const DataType *in,DataType *out) {
+#ifdef AVX2
+    const __m256i *inp = reinterpret_cast<const __m256i *>(in);
+    __m256i *outp = reinterpret_cast<__m256i *>(out);
+    for (size_t i = 0; i < (size * 8 * sizeof(DataType)) / simdWidth; ++i) {
+        outp[i] = _mm256_load_si256(inp+i);
+    }
+#else
+#error SIMD support requires AVX2
+#endif
+}
+
 template <size_t size, typename InType, typename OutType>
 inline void vec_add(const InType *in, OutType *out) {
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
@@ -77,9 +90,9 @@ inline void vec_add(const InType *in, OutType *out) {
 
 template <size_t size, typename InType, typename OutType>
 inline void vec_sub(const InType *in, OutType *out) {
+#ifdef AVX2
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
     __m256i *outp = reinterpret_cast<__m256i *>(out);
-#ifdef AVX2
     for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
         outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
     }
