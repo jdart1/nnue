@@ -98,7 +98,14 @@ class ChessInterface {
     }
 
     // Change the state of this interace to the previous position
-    void previous() { pos = pos->previous; }
+    bool previous() {
+        if (hasPrevious()) {
+            pos = pos->previous;
+            return true;
+        } else {
+            return false;
+        }
+    }
 
     bool hasPrevious() const noexcept { return pos->previous != nullptr; }
 

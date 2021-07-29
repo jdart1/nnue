@@ -65,6 +65,8 @@ inline void dotProductnx32(const uint8_t *input,
 template <size_t size, typename DataType>
 inline void vec_copy(const DataType *in,DataType *out) {
 #ifdef AVX2
+    assert(in);
+    assert(out);
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
     __m256i *outp = reinterpret_cast<__m256i *>(out);
     for (size_t i = 0; i < (size * 8 * sizeof(DataType)) / simdWidth; ++i) {
@@ -108,7 +110,6 @@ inline void clamp(const InType *in, OutType *out, InType /*clampMax*/) {
     assert(sizeof(OutType)==1);
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
     __m256i *outp = reinterpret_cast<__m256i *>(out);
-    constexpr int control = 0b11011000;
     const __m256i zero = _mm256_setzero_si256();
     for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
         // load 2x256 bit registers of input data
@@ -121,7 +122,7 @@ inline void clamp(const InType *in, OutType *out, InType /*clampMax*/) {
             &outp[i],
             _mm256_permute4x64_epi64(
                 _mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero),
-                control));
+                0b1101100));
     }
 #else
 #error SIMD support requires AVX2
