@@ -122,7 +122,7 @@ inline void clamp(const InType *in, OutType *out, InType /*clampMax*/) {
             &outp[i],
             _mm256_permute4x64_epi64(
                 _mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero),
-                0b1101100));
+                0b11011000));
     }
 #else
 #error SIMD support requires AVX2

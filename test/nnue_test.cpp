@@ -403,10 +403,8 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
     ciTarget.getAccumulator().setEmpty();
 
     // use the API that takes incremental or regular path
-    evaluator.updateAccum(network, ciTarget, nnue::White,
-                          ciTarget.getAccumulator());
-    evaluator.updateAccum(network, ciTarget, nnue::Black,
-                          ciTarget.getAccumulator());
+    evaluator.updateAccum(network, ciTarget, nnue::White);
+    evaluator.updateAccum(network, ciTarget, nnue::Black);
 
     // Compare results again
     errs += accumCompare(ciTarget.getAccumulator(), accum);
