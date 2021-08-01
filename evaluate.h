@@ -119,7 +119,6 @@ template <typename ChessInterface> class Evaluator {
         ChessInterface ci(intf);
         bool incrementalOk = true;
         // initial position should always be not computed
-        assert(ci.getAccumulator().getState(half) == AccumulatorState::Empty);
         while (ci.getAccumulator().getState(half) == AccumulatorState::Empty) {
             unsigned dn = ci.getDirtyNum();
             if (dn == 0) {
