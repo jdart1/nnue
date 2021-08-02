@@ -4,7 +4,7 @@
 
 // Arasan uses stdendian, which defines the various swap functions as macros
 #ifdef _STDENDIAN_H_
-#if __BYTE_ORDER == __BIG_ENDIAN
+#if _BYTE_ORDER == _BIG_ENDIAN
 static uint16_t to_little_endian16(uint16_t x) { return bswap16(x); }
 static uint32_t to_little_endian32(uint32_t x) { return bswap32(x); }
 static uint64_t to_little_endian64(uint64_t x) { return bswap64(x); }
@@ -31,20 +31,18 @@ static uint64_t to_little_endian64(uint64_t x) { return (x); }
 #endif
 #endif
 
-template <typename T> 
-T read_little_endian(std::istream &s)
-{
+template <typename T> T read_little_endian(std::istream &s) {
     char buf[sizeof(T)];
     s.read(buf, sizeof(T));
-    T input = *(reinterpret_cast<T*>(buf));
-    switch(sizeof(T)){
+    T input = *(reinterpret_cast<T *>(buf));
+    switch (sizeof(T)) {
     case 1:
         return static_cast<T>(input);
-    case 2: 
+    case 2:
         return static_cast<T>(to_little_endian16(input));
-    case 4: 
+    case 4:
         return static_cast<T>(to_little_endian32(input));
-    case 8: 
+    case 8:
         return static_cast<T>(to_little_endian64(input));
     default:
         throw std::invalid_argument("unsupported size");
