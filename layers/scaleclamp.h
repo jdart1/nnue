@@ -16,7 +16,7 @@ class ScaleAndClamp
 
     virtual void doForward(const InputType *input, OutputType *output) const
         noexcept {
-#ifdef SIMD
+#if defined(SIMD)
         // TBD assume fixed scale factor
         assert(_scaleFactor == 64);
         simd::scale_and_clamp<size, InputType, OutputType>(input, output, 6,

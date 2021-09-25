@@ -7,12 +7,20 @@ extern "C" {
 }
 
 namespace simd {
-static constexpr size_t simdWidth = 256;
 
-static const __m256i ones256 = _mm256_set1_epi16(1);
+#ifdef AVX2
+    using vec_t = __m256i;
+    static constexpr size_t simdWidth = 256;
+    static const __m256i ones256 = _mm256_set1_epi16(1);
+#elif defined(SSE2)
+    using vec_t = __m128i;
+    static constexpr size_t simdWidth = 128;
+#else
+#error SIMD support requires AVX2 or SSE2
+#endif
 
-inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
-                           const int32_t *biases, int32_t *output) {
+static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
+                                  const int32_t *biases, int32_t *output) {
 #ifdef AVX2
     const __m256i *iv = reinterpret_cast<const __m256i *>(input);
     const __m256i *row = reinterpret_cast<const __m256i *>(weights);
@@ -28,7 +36,13 @@ inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_CDAB));
     *output = _mm_cvtsi128_si32(sum128) + biases[0];
 #else
-#error SIMD support requires AVX2
+    constexpr size_t inputSize = 32;
+    using OutType = int32_t;
+    output[0] = static_cast<OutType>(biases[0]);
+    for (size_t j = 0; j < inputSize; j++) {
+        output[0] +=
+            static_cast<OutType>(input[j] * weights[j]);
+    }
 #endif
 }
 
@@ -58,53 +72,69 @@ inline void dotProductnx32(const uint8_t *input,
         output[i] += _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
     }
 #else
-#error SIMD support requires AVX2
+    // generic version
+    using OutType = int32_t;
+    for (size_t i = 0; i < outputSize; i++) {
+        output[i] = static_cast<OutType>(biases[i]);
+    }
+    for (size_t i = 0; i < outputSize; i++) {
+        for (size_t j = 0; j < inputSize; j++) {
+            output[i] +=
+                static_cast<OutType>(input[j] * weights[i][j]);
+        }
+    }
 #endif
 }
 
 template <size_t size, typename DataType>
 inline void vec_copy(const DataType *in,DataType *out) {
-#ifdef AVX2
     assert(in);
     assert(out);
-    const __m256i *inp = reinterpret_cast<const __m256i *>(in);
-    __m256i *outp = reinterpret_cast<__m256i *>(out);
+    const vec_t *inp = reinterpret_cast<const vec_t *>(in);
+    vec_t *outp = reinterpret_cast<vec_t *>(out);
     for (size_t i = 0; i < (size * 8 * sizeof(DataType)) / simdWidth; ++i) {
+#ifdef AVX2
         outp[i] = _mm256_load_si256(inp+i);
-    }
+#elif defined(SSE2)
+        outp[i] = _mm_load_si128(inp+i);
 #else
 #error SIMD support requires AVX2
 #endif
+    }
 }
 
 template <size_t size, typename InType, typename OutType>
 inline void vec_add(const InType *in, OutType *out) {
-    const __m256i *inp = reinterpret_cast<const __m256i *>(in);
-    __m256i *outp = reinterpret_cast<__m256i *>(out);
-#ifdef AVX2
+    const vec_t *inp = reinterpret_cast<const vec_t *>(in);
+    vec_t *outp = reinterpret_cast<vec_t *>(out);
     for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+#ifdef AVX2
         outp[i] = _mm256_add_epi16(outp[i], inp[i]);
-    }
+#elif defined(SSE2)
+        outp[i] = _mm_add_epi16(outp[i], inp[i]);
 #else
-#error SIMD support requires AVX2
+#error SIMD support requires AVX2 or SSE2
 #endif
+    }
 }
 
 template <size_t size, typename InType, typename OutType>
 inline void vec_sub(const InType *in, OutType *out) {
-#ifdef AVX2
-    const __m256i *inp = reinterpret_cast<const __m256i *>(in);
-    __m256i *outp = reinterpret_cast<__m256i *>(out);
+    const vec_t *inp = reinterpret_cast<const vec_t *>(in);
+    vec_t *outp = reinterpret_cast<vec_t *>(out);
     for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+#ifdef AVX2
         outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
-    }
+#elif defined(SSE2)
+        outp[i] = _mm_sub_epi16(outp[i], inp[i]);
 #else
-#error SIMD support requires AVX2
+#error SIMD support requires AVX2 or SSE2
 #endif
+    }
 }
 
 template <size_t size, typename InType, typename OutType>
-inline void clamp(const InType *in, OutType *out, InType /*clampMax*/) {
+inline void clamp(const InType *in, OutType *out, InType clampMax) {
 #ifdef AVX2
     assert(sizeof(InType)==2);
     assert(sizeof(OutType)==1);
@@ -124,13 +154,31 @@ inline void clamp(const InType *in, OutType *out, InType /*clampMax*/) {
                 _mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero),
                 0b11011000));
     }
+#elif defined(SSE2)
+    __m128i packedZeros = _mm_setzero_si128();
+    __m128i packedMax = _mm_set1_epi16(clampMax);
+    const __m128i *inp = reinterpret_cast<const __m128i *>(in);
+    __m128i *outp = reinterpret_cast<__m128i *>(out);
+    for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+        __m128i out0, out1;
+        __m128i words0 = _mm_load_si128(
+            reinterpret_cast<const __m128i *>(inp + 2 * i + 0));
+        __m128i words1 = _mm_load_si128(
+            reinterpret_cast<const __m128i *>(inp + 2 * i + 1));
+        out0 = _mm_min_epi16(_mm_max_epi16(words0, packedZeros), packedMax);
+        out1 = _mm_min_epi16(_mm_max_epi16(words1, packedZeros), packedMax);
+        outp[i] = _mm_packs_epi16(out0,out1);
+    }
 #else
-#error SIMD support requires AVX2
+    for (size_t i = 0; i < size; i++) {
+        *out++ = static_cast<OutType>(std::clamp<InType>(
+                                         in[i], 0, clampMax));
+    }
 #endif
 }
 
 template <size_t size, typename InType, typename OutType>
-inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, InType /*clampMax*/) {
+inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, InType clampMax) {
 #ifdef AVX2
     assert(sizeof(InType)==4);
     assert(sizeof(OutType)==1);
@@ -146,7 +194,9 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, InT
         outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero), control);
     }
 #else
-#error SIMD support requires AVX2
+    for (size_t i = 0; i < size; i++) {
+        *out++ = static_cast<OutType>(std::clamp<InType>(in[i]>>rshift, 0, clampMax));
+    }
 #endif
 }
 

@@ -14,7 +14,7 @@ class Clamp : public TypedLayer<InputType, OutputType, size, size, alignment> {
 
     virtual void doForward(const InputType *input, OutputType *output) const
         noexcept {
-#ifdef SIMD
+#if defined(SIMD)
         simd::clamp<size, InputType, OutputType>(input, output, _clampMax);
 #else
         for (size_t i = 0; i < size; i++) {
