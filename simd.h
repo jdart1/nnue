@@ -135,11 +135,11 @@ inline void vec_sub(const InType *in, OutType *out) {
 
 template <size_t size, typename InType, typename OutType>
 inline void clamp(const InType *in, OutType *out, InType clampMax) {
+    const vec_t *inp = reinterpret_cast<const vec_t *>(in);
+    vec_t *outp = reinterpret_cast<vec_t *>(out);
 #ifdef AVX2
     assert(sizeof(InType)==2);
     assert(sizeof(OutType)==1);
-    const __m256i *inp = reinterpret_cast<const __m256i *>(in);
-    __m256i *outp = reinterpret_cast<__m256i *>(out);
     const __m256i zero = _mm256_setzero_si256();
     for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
         // load 2x256 bit registers of input data
@@ -157,8 +157,6 @@ inline void clamp(const InType *in, OutType *out, InType clampMax) {
 #elif defined(SSE2)
     __m128i packedZeros = _mm_setzero_si128();
     __m128i packedMax = _mm_set1_epi16(clampMax);
-    const __m128i *inp = reinterpret_cast<const __m128i *>(in);
-    __m128i *outp = reinterpret_cast<__m128i *>(out);
     for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
         __m128i out0, out1;
         __m128i words0 = _mm_load_si128(
@@ -178,12 +176,12 @@ inline void clamp(const InType *in, OutType *out, InType clampMax) {
 }
 
 template <size_t size, typename InType, typename OutType>
-inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, InType clampMax) {
+inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[maybe_unused]] InType clampMax) {
+    const vec_t *inp = reinterpret_cast<const vec_t *>(in);
+    vec_t *outp = reinterpret_cast<vec_t *>(out);
 #ifdef AVX2
     assert(sizeof(InType)==4);
     assert(sizeof(OutType)==1);
-    __m256i *inp = const_cast<__m256i *>(reinterpret_cast<const __m256i*>(in));
-    __m256i *outp = reinterpret_cast<__m256i *>(out);
     const __m256i control = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
     const __m256i zero = _mm256_setzero_si256();
     for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
@@ -192,6 +190,26 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, InT
         __m256i r2  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
         // clamp and store into one 256-bit output chunk
         outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero), control);
+    }
+#elif defined(SSE2)
+    assert(sizeof(InType)==4);
+    assert(sizeof(OutType)==1);
+#ifdef SSE41
+    const vec_t zero = _mm_setzero_si128();
+#else
+    const vec_t k0x80s = _mm_set1_epi8(-128);
+#endif
+    for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+        // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and clamp
+        vec_t r1  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
+        vec_t r2  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
+        // pack into 8-bit output and clamp
+        outp[i] =
+#ifdef SSE41
+            _mm_max_epi8(_mm_packs_epi16(r1, r2), zero);
+#else
+            _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(r1, r2), k0x80s), k0x80s);
+#endif
     }
 #else
     for (size_t i = 0; i < size; i++) {

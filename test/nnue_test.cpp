@@ -499,7 +499,7 @@ static int test_scale_and_clamp() {
     ScaleAndClamper c(SCALE,CLAMP_MAX);
 
     for (unsigned i = 0; i < SIZE; i++) {
-        input[i] = (i%20)-10 + (i%5)*1024;
+        input[i] = -9000 + 900*std::min<unsigned>(i,10) + i;
         output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i]/SCALE,0,CLAMP_MAX));
     }
     std::memset(output2,'\0',SIZE*sizeof(OutputType));
