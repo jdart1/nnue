@@ -19,6 +19,11 @@ namespace simd {
 #error SIMD support requires AVX2 or SSE2
 #endif
 
+template <typename T>
+static inline size_t chunks(unsigned len) {
+    return (len * 8 * sizeof(T)) / simdWidth;
+}
+
 static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
                                   const int32_t *biases, int32_t *output) {
 #ifdef AVX2
@@ -35,6 +40,21 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_BADC));
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_CDAB));
     *output = _mm_cvtsi128_si32(sum128) + biases[0];
+#elif defined(SSE2)
+    const vec_t *iv = reinterpret_cast<const vec_t *>(input);
+    const vec_t *row = reinterpret_cast<const vec_t *>(weights);
+    const vec_t ones = _mm_set1_epi16(1);
+    // TBD: requires SSE3
+    vec_t p0 = _mm_madd_epi16(_mm_maddubs_epi16(iv[0], row[0]), ones);
+    vec_t p1 = _mm_madd_epi16(_mm_maddubs_epi16(iv[1], row[1]), ones);
+    vec_t sum = _mm_add_epi32(p0, p1);
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xb));
+#ifdef SSE41
+    output[0] = _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1) + biases[0];
+#else
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1));
+    output[0] = _mm_cvtsi128_si32(sum) + biases[0];
+#endif
 #else
     constexpr size_t inputSize = 32;
     using OutType = int32_t;
@@ -71,6 +91,33 @@ inline void dotProductnx32(const uint8_t *input,
         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
         output[i] += _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
     }
+#elif defined(SSE2)
+    const vec_t zeros = _mm_setzero_si128();
+    for (unsigned i = 0; i < outputSize; i++) {
+        __m128i sum_lo = _mm_cvtsi32_si128(biases[i]);
+        __m128i sum_hi = zeros;
+        const auto row = reinterpret_cast<const vec_t*>(&weights[i]);
+        const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+        for (unsigned j = 0; j < chunks<uint8_t>(inputSize); ++j) {
+            __m128i row_j = _mm_load_si128(&row[j]);
+            __m128i input_j = _mm_load_si128(&inp[j]);
+            __m128i row_signs = _mm_cmpgt_epi8(zeros, row_j);
+            __m128i extended_row_lo = _mm_unpacklo_epi8(row_j, row_signs);
+            __m128i extended_row_hi = _mm_unpackhi_epi8(row_j, row_signs);
+            __m128i extended_input_lo = _mm_unpacklo_epi8(input_j, zeros);
+            __m128i extended_input_hi = _mm_unpackhi_epi8(input_j, zeros);
+            __m128i product_lo = _mm_madd_epi16(extended_row_lo, extended_input_lo);
+            __m128i product_hi = _mm_madd_epi16(extended_row_hi, extended_input_hi);
+            sum_lo = _mm_add_epi32(sum_lo, product_lo);
+            sum_hi = _mm_add_epi32(sum_hi, product_hi);
+        }
+        __m128i sum = _mm_add_epi32(sum_lo, sum_hi);
+        __m128i sum_high_64 = _mm_shuffle_epi32(sum, _MM_SHUFFLE(1, 0, 3, 2));
+        sum = _mm_add_epi32(sum, sum_high_64);
+        __m128i sum_second_32 = _mm_shufflelo_epi16(sum, _MM_SHUFFLE(1, 0, 3, 2));
+        sum = _mm_add_epi32(sum, sum_second_32);
+        output[i] = _mm_cvtsi128_si32(sum);
+    }
 #else
     // generic version
     using OutType = int32_t;
@@ -92,7 +139,7 @@ inline void vec_copy(const DataType *in,DataType *out) {
     assert(out);
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
-    for (size_t i = 0; i < (size * 8 * sizeof(DataType)) / simdWidth; ++i) {
+    for (size_t i = 0; i < chunks<DataType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_load_si256(inp+i);
 #elif defined(SSE2)
@@ -107,7 +154,7 @@ template <size_t size, typename InType, typename OutType>
 inline void vec_add(const InType *in, OutType *out) {
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
-    for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+    for (size_t i = 0; i < chunks<OutType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_add_epi16(outp[i], inp[i]);
 #elif defined(SSE2)
@@ -122,7 +169,7 @@ template <size_t size, typename InType, typename OutType>
 inline void vec_sub(const InType *in, OutType *out) {
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
-    for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+    for (size_t i = 0; i < chunks<OutType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
 #elif defined(SSE2)
@@ -141,7 +188,7 @@ inline void clamp(const InType *in, OutType *out, InType clampMax) {
     assert(sizeof(InType)==2);
     assert(sizeof(OutType)==1);
     const __m256i zero = _mm256_setzero_si256();
-    for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+    for (size_t i = 0; i < chunks<OutType>(size); ++i) {
         // load 2x256 bit registers of input data
         __m256i words0 = _mm256_load_si256(
             reinterpret_cast<const __m256i *>(inp + 2 * i + 0));
@@ -157,7 +204,7 @@ inline void clamp(const InType *in, OutType *out, InType clampMax) {
 #elif defined(SSE2)
     __m128i packedZeros = _mm_setzero_si128();
     __m128i packedMax = _mm_set1_epi16(clampMax);
-    for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+    for (size_t i = 0; i < chunks<OutType>(size); ++i) {
         __m128i out0, out1;
         __m128i words0 = _mm_load_si128(
             reinterpret_cast<const __m128i *>(inp + 2 * i + 0));
@@ -184,7 +231,7 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
     assert(sizeof(OutType)==1);
     const __m256i control = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
     const __m256i zero = _mm256_setzero_si256();
-    for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+    for (size_t i = 0; i < chunks<OutType>(size); ++i) {
         // load 2x256 bit registers of shifted input data (32 bit input, 16 bit output)
         __m256i r1  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
         __m256i r2  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
@@ -199,7 +246,7 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
 #else
     const vec_t k0x80s = _mm_set1_epi8(-128);
 #endif
-    for (size_t i = 0; i < (size * 8 * sizeof(OutType)) / simdWidth; ++i) {
+    for (size_t i = 0; i < chunks<OutType>(size); ++i) {
         // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and clamp
         vec_t r1  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
         vec_t r2  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
