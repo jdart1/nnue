@@ -12,11 +12,11 @@ namespace simd {
     using vec_t = __m256i;
     static constexpr size_t simdWidth = 256;
     static const __m256i ones256 = _mm256_set1_epi16(1);
-#elif defined(SSE2)
+#elif defined(SSE2) || defined(SSE3)
     using vec_t = __m128i;
     static constexpr size_t simdWidth = 128;
 #else
-#error SIMD support requires AVX2 or SSE2
+#error must set at least one of: AVX2, SSE3 or SSE2
 #endif
 
 template <typename T>
@@ -40,13 +40,12 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_BADC));
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_CDAB));
     *output = _mm_cvtsi128_si32(sum128) + biases[0];
-#elif defined(SSE2)
-    const vec_t *iv = reinterpret_cast<const vec_t *>(input);
+#elif defined(SSE3)
+    const vec_t *inp = reinterpret_cast<const vec_t *>(input);
     const vec_t *row = reinterpret_cast<const vec_t *>(weights);
     const vec_t ones = _mm_set1_epi16(1);
-    // TBD: requires SSE3
-    vec_t p0 = _mm_madd_epi16(_mm_maddubs_epi16(iv[0], row[0]), ones);
-    vec_t p1 = _mm_madd_epi16(_mm_maddubs_epi16(iv[1], row[1]), ones);
+    vec_t p0 = _mm_madd_epi16(_mm_maddubs_epi16(inp[0], row[0]), ones);
+    vec_t p1 = _mm_madd_epi16(_mm_maddubs_epi16(inp[1], row[1]), ones);
     vec_t sum = _mm_add_epi32(p0, p1);
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xb));
 #ifdef SSE41
@@ -55,14 +54,32 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1));
     output[0] = _mm_cvtsi128_si32(sum) + biases[0];
 #endif
-#else
-    constexpr size_t inputSize = 32;
-    using OutType = int32_t;
-    output[0] = static_cast<OutType>(biases[0]);
-    for (size_t j = 0; j < inputSize; j++) {
-        output[0] +=
-            static_cast<OutType>(input[j] * weights[j]);
+#elif defined(SSE2)
+    const vec_t zeros = _mm_setzero_si128();
+    vec_t sum_lo, sum_hi;
+    sum_lo = sum_hi = zeros;
+    const auto row = reinterpret_cast<const vec_t*>(weights);
+    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+    constexpr unsigned inputSize = 32;
+    for (unsigned j = 0; j < chunks<uint8_t>(inputSize); ++j) {
+        __m128i row_j = _mm_load_si128(&row[j]);
+        __m128i input_j = _mm_load_si128(&inp[j]);
+        __m128i row_signs = _mm_cmpgt_epi8(zeros, row_j);
+        __m128i extended_row_lo = _mm_unpacklo_epi8(row_j, row_signs);
+        __m128i extended_row_hi = _mm_unpackhi_epi8(row_j, row_signs);
+        __m128i extended_input_lo = _mm_unpacklo_epi8(input_j, zeros);
+        __m128i extended_input_hi = _mm_unpackhi_epi8(input_j, zeros);
+        __m128i product_lo = _mm_madd_epi16(extended_row_lo, extended_input_lo);
+        __m128i product_hi = _mm_madd_epi16(extended_row_hi, extended_input_hi);
+        sum_lo = _mm_add_epi32(sum_lo, product_lo);
+        sum_hi = _mm_add_epi32(sum_hi, product_hi);
     }
+    __m128i sum = _mm_add_epi32(sum_lo, sum_hi);
+    __m128i sum_high_64 = _mm_shuffle_epi32(sum, _MM_SHUFFLE(1, 0, 3, 2));
+    sum = _mm_add_epi32(sum, sum_high_64);
+    __m128i sum_second_32 = _mm_shufflelo_epi16(sum, _MM_SHUFFLE(1, 0, 3, 2));
+    sum = _mm_add_epi32(sum, sum_second_32);
+    output[0] = _mm_cvtsi128_si32(sum) + biases[0];
 #endif
 }
 
@@ -91,13 +108,33 @@ inline void dotProductnx32(const uint8_t *input,
         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
         output[i] += _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
     }
+#elif defined(SSE3)
+    const vec_t *inp = reinterpret_cast<const vec_t *>(input);
+    const vec_t ones = _mm_set1_epi16(1);
+    for (unsigned i = 0; i < outputSize; i++) {
+        const vec_t *row = reinterpret_cast<const vec_t *>(weights + i);
+        vec_t total  = _mm_setzero_si128();
+        for (unsigned j = 0; j < chunks<uint8_t>(inputSize)/2; ++j) {
+            vec_t p0 = _mm_madd_epi16(_mm_maddubs_epi16(inp[2*j+0], row[2*j+0]), ones);
+            vec_t p1 = _mm_madd_epi16(_mm_maddubs_epi16(inp[2*j+1], row[2*j+1]), ones);
+            vec_t sum = _mm_add_epi32(p0, p1);
+            sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xb));
+            total = _mm_add_epi32(total,sum);
+        }
+#ifdef SSE41
+        output[i] = _mm_cvtsi128_si32(total) + _mm_extract_epi32(total, 1) + biases[i];
+#else
+        total = _mm_add_epi32(total, _mm_shuffle_epi32(total, 1));
+        output[i] = _mm_cvtsi128_si32(total) + biases[i];
+#endif
+    }
 #elif defined(SSE2)
     const vec_t zeros = _mm_setzero_si128();
+    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
     for (unsigned i = 0; i < outputSize; i++) {
         __m128i sum_lo = _mm_cvtsi32_si128(biases[i]);
         __m128i sum_hi = zeros;
         const auto row = reinterpret_cast<const vec_t*>(&weights[i]);
-        const vec_t *inp = reinterpret_cast<const vec_t*>(input);
         for (unsigned j = 0; j < chunks<uint8_t>(inputSize); ++j) {
             __m128i row_j = _mm_load_si128(&row[j]);
             __m128i input_j = _mm_load_si128(&inp[j]);
@@ -118,18 +155,6 @@ inline void dotProductnx32(const uint8_t *input,
         sum = _mm_add_epi32(sum, sum_second_32);
         output[i] = _mm_cvtsi128_si32(sum);
     }
-#else
-    // generic version
-    using OutType = int32_t;
-    for (size_t i = 0; i < outputSize; i++) {
-        output[i] = static_cast<OutType>(biases[i]);
-    }
-    for (size_t i = 0; i < outputSize; i++) {
-        for (size_t j = 0; j < inputSize; j++) {
-            output[i] +=
-                static_cast<OutType>(input[j] * weights[i][j]);
-        }
-    }
 #endif
 }
 
@@ -142,10 +167,8 @@ inline void vec_copy(const DataType *in,DataType *out) {
     for (size_t i = 0; i < chunks<DataType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_load_si256(inp+i);
-#elif defined(SSE2)
+#elif defined(SSE2) || defined(SSE3)
         outp[i] = _mm_load_si128(inp+i);
-#else
-#error SIMD support requires AVX2
 #endif
     }
 }
@@ -157,10 +180,8 @@ inline void vec_add(const InType *in, OutType *out) {
     for (size_t i = 0; i < chunks<OutType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_add_epi16(outp[i], inp[i]);
-#elif defined(SSE2)
+#elif defined(SSE2) || defined(SSE3)
         outp[i] = _mm_add_epi16(outp[i], inp[i]);
-#else
-#error SIMD support requires AVX2 or SSE2
 #endif
     }
 }
@@ -172,16 +193,14 @@ inline void vec_sub(const InType *in, OutType *out) {
     for (size_t i = 0; i < chunks<OutType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
-#elif defined(SSE2)
+#elif defined(SSE2) || defined(SSE3)
         outp[i] = _mm_sub_epi16(outp[i], inp[i]);
-#else
-#error SIMD support requires AVX2 or SSE2
 #endif
     }
 }
 
 template <size_t size, typename InType, typename OutType>
-inline void clamp(const InType *in, OutType *out, InType clampMax) {
+inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampMax) {
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
 #ifdef AVX2
@@ -201,7 +220,7 @@ inline void clamp(const InType *in, OutType *out, InType clampMax) {
                 _mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero),
                 0b11011000));
     }
-#elif defined(SSE2)
+#elif defined(SSE2) || defined(SSE3)
     __m128i packedZeros = _mm_setzero_si128();
     __m128i packedMax = _mm_set1_epi16(clampMax);
     for (size_t i = 0; i < chunks<OutType>(size); ++i) {
@@ -238,7 +257,7 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
         // clamp and store into one 256-bit output chunk
         outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero), control);
     }
-#elif defined(SSE2)
+#elif defined(SSE2) || defined(SSE3)
     assert(sizeof(InType)==4);
     assert(sizeof(OutType)==1);
 #ifdef SSE41
@@ -257,10 +276,6 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
 #else
             _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(r1, r2), k0x80s), k0x80s);
 #endif
-    }
-#else
-    for (size_t i = 0; i < size; i++) {
-        *out++ = static_cast<OutType>(std::clamp<InType>(in[i]>>rshift, 0, clampMax));
     }
 #endif
 }
