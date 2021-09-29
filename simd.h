@@ -233,11 +233,6 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
         out1 = _mm_min_epi16(_mm_max_epi16(words1, packedZeros), packedMax);
         outp[i] = _mm_packs_epi16(out0,out1);
     }
-#else
-    for (size_t i = 0; i < size; i++) {
-        *out++ = static_cast<OutType>(std::clamp<InType>(
-                                         in[i], 0, clampMax));
-    }
 #endif
 }
 
