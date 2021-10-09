@@ -12,11 +12,11 @@ namespace simd {
     using vec_t = __m256i;
     static constexpr size_t simdWidth = 256;
     static const __m256i ones256 = _mm256_set1_epi16(1);
-#elif defined(SSE2) || defined(SSE3)
+#elif defined(SSE2) || defined(SSSE3)
     using vec_t = __m128i;
     static constexpr size_t simdWidth = 128;
 #else
-#error must set at least one of: AVX2, SSE3 or SSE2
+#error must set at least one of: AVX2, SSSE3 or SSE2
 #endif
 
 template <typename T>
@@ -40,7 +40,7 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_BADC));
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_CDAB));
     *output = _mm_cvtsi128_si32(sum128) + biases[0];
-#elif defined(SSE3)
+#elif defined(SSSE3)
     const vec_t *inp = reinterpret_cast<const vec_t *>(input);
     const vec_t *row = reinterpret_cast<const vec_t *>(weights);
     const vec_t ones = _mm_set1_epi16(1);
@@ -108,7 +108,7 @@ inline void dotProductnx32(const uint8_t *input,
         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
         output[i] += _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
     }
-#elif defined(SSE3)
+#elif defined(SSSE3)
     const vec_t *inp = reinterpret_cast<const vec_t *>(input);
     const vec_t ones = _mm_set1_epi16(1);
     for (unsigned i = 0; i < outputSize; i++) {
@@ -167,7 +167,7 @@ inline void vec_copy(const DataType *in,DataType *out) {
     for (size_t i = 0; i < chunks<DataType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_load_si256(inp+i);
-#elif defined(SSE2) || defined(SSE3)
+#elif defined(SSE2) || defined(SSSE3)
         outp[i] = _mm_load_si128(inp+i);
 #endif
     }
@@ -180,7 +180,7 @@ inline void vec_add(const InType *in, OutType *out) {
     for (size_t i = 0; i < chunks<OutType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_add_epi16(outp[i], inp[i]);
-#elif defined(SSE2) || defined(SSE3)
+#elif defined(SSE2) || defined(SSSE3)
         outp[i] = _mm_add_epi16(outp[i], inp[i]);
 #endif
     }
@@ -193,7 +193,7 @@ inline void vec_sub(const InType *in, OutType *out) {
     for (size_t i = 0; i < chunks<OutType>(size); ++i) {
 #ifdef AVX2
         outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
-#elif defined(SSE2) || defined(SSE3)
+#elif defined(SSE2) || defined(SSSE3)
         outp[i] = _mm_sub_epi16(outp[i], inp[i]);
 #endif
     }
@@ -220,7 +220,7 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
                 _mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero),
                 0b11011000));
     }
-#elif defined(SSE2) || defined(SSE3)
+#elif defined(SSE2) || defined(SSSE3)
     __m128i packedZeros = _mm_setzero_si128();
     __m128i packedMax = _mm_set1_epi16(clampMax);
     for (size_t i = 0; i < chunks<OutType>(size); ++i) {
@@ -252,7 +252,7 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
         // clamp and store into one 256-bit output chunk
         outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero), control);
     }
-#elif defined(SSE2) || defined(SSE3)
+#elif defined(SSE2) || defined(SSSE3)
     assert(sizeof(InType)==4);
     assert(sizeof(OutType)==1);
 #ifdef SSE41

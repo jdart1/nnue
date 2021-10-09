@@ -29,11 +29,11 @@ Requires C++-17. The Makefile (Gnu Make) builds a test executable. -DSIMD must b
 
 1. VNNI (in addition to AVX2)
 2. AVX2
-3. SSE41 (in addition to SSE3)
-4. SSE3 (assumes SSE2 also present)
+3. SSE41 (in addition to SSSE3)
+4. SSSE3 (assumes SSE2 also present)
 5. SSE2
 
-At least one of: AVX2, SSE3 or SSE2 must be selected.
+If -DSIMD is enabled, at least one of: AVX2, SSSE3 or SSE2 must also be selected.
 
 ## Interface
 
