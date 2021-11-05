@@ -81,7 +81,7 @@ class ChessInterface {
 
     void setDirtyNum(unsigned num) { pos->dirty_num = num; }
 
-    void getDirtyState(int index, nnue::Square &from, nnue::Square &to,
+    void getDirtyState(size_t index, nnue::Square &from, nnue::Square &to,
                        nnue::Piece &p) const {
         const DirtyState &state = pos->dirty[index];
         from = state.from;

@@ -3,7 +3,7 @@
 #
 NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic -fsanitize=address -fsanitize=bounds-strict
 
-ARCH_FLAGS = -mavx2 -mbmi2 -DSIMD -DAVX2
+ARCH_FLAGS = -mavx2 -mbmi2 -DSIMD -DSSSE3
 
 #OPT = -O3
 OPT = -g
