@@ -1,4 +1,4 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
 #include "nnue.h"
 
 #include <algorithm>
@@ -27,11 +27,6 @@ static int test_linear() {
 
     static BiasType biases[COLS];
     static WeightType weights[COLS][ROWS]; // indexed first by output
-
-    unsigned seed1 =
-        std::chrono::system_clock::now().time_since_epoch().count();
-    std::mt19937 gen(seed1);
-    std::uniform_int_distribution<WeightType> dist(-127, 127);
 
     constexpr size_t bufSize = COLS*sizeof(BiasType)+ (ROWS * COLS)*sizeof(WeightType);
     auto buf = std::unique_ptr<std::byte[]>(new std::byte[bufSize]);
