@@ -4,7 +4,7 @@ This code provides an implementation of a [Efficiently Updatable Neural Network 
 
 ## Copyright, license
 
-Copyright 2021 by Jon Dart. All Rights Reserved.
+Copyright 2021-2022 by Jon Dart. All Rights Reserved.
 
 MIT Licensed.
 
@@ -18,7 +18,6 @@ MIT Licensed.
 
 ## Missing Features
 
-- no AVX512 support
 - no SIMD for non-Intel such as M1
 - read only, no support for writing network files
 - does not validate hash codes from existing network files
@@ -27,11 +26,12 @@ MIT Licensed.
 
 Requires C++-17. The Makefile (Gnu Make) builds a test executable. -DSIMD must be specificed to select SIMD optimizations. If SIMD is set then tthe following flags can be set to select the desired instruction set(s). They can be combined and are utilized in the following order of precedence.
 
-1. VNNI (in addition to AVX2)
-2. AVX2
-3. SSE41 (in addition to SSSE3)
-4. SSSE3 (assumes SSE2 also present)
-5. SSE2
+1. AVX512
+2. VNNI (in addition to AVX2)
+3. AVX2
+4. SSE41 (in addition to SSSE3)
+5. SSSE3 (assumes SSE2 also present)
+6. SSE2
 
 If -DSIMD is enabled, at least one of: AVX2, SSSE3 or SSE2 must also be selected.
 
