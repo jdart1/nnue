@@ -8,7 +8,7 @@ static const std::unordered_map<char, nnue::Piece> pieceMap = {
     {'R', nnue::WhiteRook}, {'Q', nnue::WhiteQueen},  {'K', nnue::WhiteKing}};
 
 Position::Position(const std::string &fen) 
-    : previous(nullptr)
+    : previous(nullptr),dirty_num(0)
 {
     int parts = 0;
     nnue::Square sq(56);
