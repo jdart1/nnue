@@ -19,6 +19,7 @@ namespace simd {
     static const vec_t ones256 = _mm256_set1_epi16(1);
 #elif defined(SSE2) || defined(SSSE3)
     using vec_t = __m128i;
+    static const vec_t ones128 = _mm_set1_epi16(1);
     static constexpr size_t simdWidth = 128;
 #else
 #error must set at least one of: AVX2, SSSE3 or SSE2
@@ -49,8 +50,8 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
 #elif defined(SSSE3)
     const vec_t *inp = reinterpret_cast<const vec_t *>(input);
     const vec_t *row = reinterpret_cast<const vec_t *>(weights);
-    vec_t p0 = _mm_madd_epi16(_mm_maddubs_epi16(inp[0], row[0]), ones256);
-    vec_t p1 = _mm_madd_epi16(_mm_maddubs_epi16(inp[1], row[1]), ones256);
+    vec_t p0 = _mm_madd_epi16(_mm_maddubs_epi16(inp[0], row[0]), ones128);
+    vec_t p1 = _mm_madd_epi16(_mm_maddubs_epi16(inp[1], row[1]), ones128);
     vec_t sum = _mm_add_epi32(p0, p1);
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xb));
 #ifdef SSE41
