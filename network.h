@@ -1,11 +1,11 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_NETWORK_H
 #define _NNUE_NETWORK_H
 
-#include "accum.h"
+#include "accumv2.h"
 #include "layers/base.h"
 #include "layers/clamp.h"
-#include "layers/halfkp.h"
+#include "layers/halfkav2hm.h"
 #include "layers/linear.h"
 #include "layers/scaleclamp.h"
 #include "util.h"
@@ -15,15 +15,15 @@ class Network {
     template <typename ChessInterface> friend class Evaluator;
 
   public:
-    static constexpr size_t HalfKpRows = 64 * (10 * 64 + 1);
+    static constexpr size_t Layer1OutputSize = 1024;
 
-    static constexpr size_t HalfKpOutputSize = 256;
+    static constexpr size_t Layer1Rows = 22 * Layer1OutputSize;
 
     using IndexArray = std::array<int, MAX_INDICES>;
     using OutputType = int32_t;
     using InputType = uint8_t; // output of transformer
-    using Layer1 = HalfKp<uint16_t, int16_t, int16_t, int16_t, HalfKpRows,
-                          HalfKpOutputSize>;
+    using Layer1 = HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, Layer1Rows,
+                              Layer1OutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
     using AccumulatorOutputType = int16_t;
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 512, 32>;
@@ -32,7 +32,7 @@ class Network {
     using ScaleAndClamper = ScaleAndClamp<int32_t, uint8_t, 32>;
     using Clamper = Clamp<int16_t, uint8_t, 512>;
 
-    static constexpr size_t BUFFER_SIZE = 2048;
+    static constexpr size_t BUFFER_SIZE = 4096;
 
     Network() {
         layers.push_back(new Layer1());
@@ -58,6 +58,11 @@ class Network {
         }
     }
 
+    template <Color kside>
+    inline static unsigned getIndex(Square kp, Piece p, Square sq) {
+        return Layer1::getIndex<kside>(kp, p, sq);
+    }
+    
     // evaluate the net (layers past the first one)
     OutputType evaluate(const AccumulatorType &accum) const {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
@@ -113,27 +118,6 @@ class Network {
 
     friend std::istream &operator>>(std::istream &i, Network &);
 
-    static constexpr unsigned map[16][2] = {
-        {0, 0}, {1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}, {0, 0},
-        {0, 0}, {2, 1}, {4, 3}, {6, 5}, {8, 7}, {10, 9}, {12, 11}, {0, 0}};
-
-    // 180 degree rotation for Black
-    template <Color kside> inline static Square rotate(Square s) {
-        return kside == Black ? Square(static_cast<int>(s) ^ 63) : s;
-    }
-
-    template <Color kside>
-    inline static unsigned getIndex(Square kp, Piece p, Square psq) {
-        assert(p != EmptyPiece);
-        Square rkp = rotate<kside>(kp);
-        unsigned pidx = map[p][kside];
-        unsigned idx = (64 * 10 + 1) * static_cast<unsigned>(rkp) +
-                       64 * (pidx - 1) +
-                       static_cast<unsigned>(rotate<kside>(psq)) + 1;
-        assert(idx < HalfKpRows);
-        return idx;
-    }
-
   protected:
     std::vector<BaseLayer *> layers;
 };
@@ -157,9 +141,7 @@ inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
     for (uint32_t i = 0; i < size; i++) {
         if (!s.get(c))
             break;
-        //        std::cout << char(c);
     }
-    //    std::cout << std::endl;
     unsigned n = 0;
     for (auto layer : network.layers) {
         if (!s.good())

@@ -112,22 +112,21 @@ static const std::unordered_map<char, nnue::Piece> pieceMap = {
     {'P', nnue::WhitePawn}, {'N', nnue::WhiteKnight}, {'B', nnue::WhiteBishop},
     {'R', nnue::WhiteRook}, {'Q', nnue::WhiteQueen},  {'K', nnue::WhiteKing}};
 
-// wrapper around nnue::HalfKp, sets up that class with some fixed parameters
-class HalfKp {
+// wrapper around nnue::HalfKaV2Hm, sets up that class with some fixed parameters
+class HalfKaV2Hm {
   public:
-    static constexpr size_t OutputSize = 256;
+    static constexpr size_t OutputSize = 1024;
 
-    static constexpr size_t InputSize = 64 * (10 * 64 + 1);
+    static constexpr size_t InputSize = 22*OutputSize;
 
     using OutputType = int16_t;
 
-    // test propagation
     using Layer1 =
-        nnue::HalfKp<uint16_t, int16_t, int16_t, int16_t, InputSize, OutputSize>;
+        nnue::HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, InputSize, OutputSize>;
 
     using AccumulatorType = Layer1::AccumulatorType;
 
-    HalfKp() : layer1(new Layer1()) {}
+    HalfKaV2Hm() : layer1(new Layer1()) {}
 
     AccumulatorType accum;
 
@@ -141,10 +140,10 @@ class HalfKp {
     std::unique_ptr<Layer1> layer1;
 };
 
-static int16_t col1[HalfKp::OutputSize];
-static int16_t col2[HalfKp::OutputSize];
-static int16_t col3[HalfKp::OutputSize];
-static int16_t col4[HalfKp::OutputSize];
+static int16_t col1[HalfKaV2Hm::OutputSize];
+static int16_t col2[HalfKaV2Hm::OutputSize];
+static int16_t col3[HalfKaV2Hm::OutputSize];
+static int16_t col4[HalfKaV2Hm::OutputSize];
 
 static int test_halfkp() {
     const std::string fen =
@@ -154,7 +153,7 @@ static int test_halfkp() {
         std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 gen(seed1);
     std::uniform_int_distribution<int16_t> dist(-1000, 1000);
-    for (size_t i = 0; i < HalfKp::OutputSize; i++) {
+    for (size_t i = 0; i < HalfKaV2Hm::OutputSize; i++) {
         col1[i] = dist(gen);
         col2[i] = dist(gen);
         col3[i] = dist(gen);
@@ -162,12 +161,48 @@ static int test_halfkp() {
     }
 
     std::unordered_set<nnue::IndexType> w_expected{
-        4231, 4235, 3860, 4117, 3869, 3872, 3937, 3878, 3944,
-        3882, 4075, 4398, 4464, 4338, 3956, 3958, 3964, 4355};
+        20800,
+        20804,
+        21062,
+        20429,
+        20686,
+        20438,
+        20441,
+        20506,
+        20447,
+        20513,
+        20451,
+        20644,
+        20967,
+        21033,
+        20907,
+        20525,
+        20527,
+        20533,
+        21110,
+        20924};
 
     std::unordered_set<nnue::IndexType> b_expected{
-        6281, 6277, 5884, 6139, 5875, 5872, 5807, 5866, 5800,
-        5862, 5925, 6370, 6304, 6174, 5788, 5786, 5780, 6157};
+        18104,
+        18108,
+        18302,
+        17717,
+        17974,
+        17710,
+        17697,
+        17634,
+        17703,
+        17625,
+        17691,
+        17756,
+        18207,
+        18129,
+        18003,
+        17621,
+        17623,
+        17613,
+        18254,
+        17988};
 
     Position p(fen);
     ChessInterface intf(&p);
@@ -214,9 +249,9 @@ static int test_halfkp() {
         std::cerr << std::endl;
     }
 
-    HalfKp halfKp;
+    HalfKaV2Hm halfKp;
 
-    HalfKp::AccumulatorType accum;
+    HalfKaV2Hm::AccumulatorType accum;
 
     halfKp.get()->setCol(4231, col1);
     halfKp.get()->setCol(3882, col2);
@@ -231,15 +266,15 @@ static int test_halfkp() {
     halfKp.get()->updateAccum(bIndices, nnue::AccumulatorHalf::Lower, accum);
     halfKp.get()->updateAccum(wIndices, nnue::AccumulatorHalf::Upper, accum);
 
-    HalfKp::OutputType expected[HalfKp::OutputSize * 2];
-    for (size_t i = 0; i < HalfKp::OutputSize; ++i) {
+    HalfKaV2Hm::OutputType expected[HalfKaV2Hm::OutputSize * 2];
+    for (size_t i = 0; i < HalfKaV2Hm::OutputSize; ++i) {
         expected[i] = col3[i] + col4[i];
     }
-    for (size_t i = HalfKp::OutputSize; i < HalfKp::OutputSize * 2; ++i) {
+    for (size_t i = HalfKaV2Hm::OutputSize; i < HalfKaV2Hm::OutputSize * 2; ++i) {
         expected[i] =
-            col1[i - HalfKp::OutputSize] + col2[i - HalfKp::OutputSize];
+            col1[i - HalfKaV2Hm::OutputSize] + col2[i - HalfKaV2Hm::OutputSize];
     }
-    for (size_t i = 0; i < HalfKp::OutputSize * 2; ++i) {
+    for (size_t i = 0; i < HalfKaV2Hm::OutputSize * 2; ++i) {
         if (expected[i] != accum.getOutput()[i]) {
             ++errs;
             std::cerr << " error at index " << int(i)
@@ -250,12 +285,12 @@ static int test_halfkp() {
     return errs;
 }
 
-static int accumCompare(const HalfKp::AccumulatorType &accum1,
-                        const HalfKp::AccumulatorType &accum2) {
-    const HalfKp::OutputType *p = accum1.getOutput();
-    const HalfKp::OutputType *q = accum2.getOutput();
+static int accumCompare(const HalfKaV2Hm::AccumulatorType &accum1,
+                        const HalfKaV2Hm::AccumulatorType &accum2) {
+    const HalfKaV2Hm::OutputType *p = accum1.getOutput();
+    const HalfKaV2Hm::OutputType *q = accum2.getOutput();
     int errs = 0;
-    for (size_t i = 0; i < 2 * HalfKp::OutputSize; i++) {
+    for (size_t i = 0; i < 2 * HalfKaV2Hm::OutputSize; i++) {
         if (*p++ != *q++) {
             ++errs;
         }
@@ -358,13 +393,13 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
         std::cerr << "added list differs" << std::endl;
     }
 
-    HalfKp halfKp;
+    HalfKaV2Hm halfKp;
 
-    HalfKp::AccumulatorType accum;
+    HalfKaV2Hm::AccumulatorType accum;
 
-    for (size_t i = 0; i < HalfKp::InputSize; i++) {
-        HalfKp::OutputType col[HalfKp::OutputSize];
-        for (size_t j = 0; j < HalfKp::OutputSize; j++) {
+    for (size_t i = 0; i < HalfKaV2Hm::InputSize; i++) {
+        HalfKaV2Hm::OutputType col[HalfKaV2Hm::OutputSize];
+        for (size_t j = 0; j < HalfKaV2Hm::OutputSize; j++) {
             col[j] = (i + j) % 10 - 5;
         }
         halfKp.get()->setCol(i, col);
@@ -418,7 +453,7 @@ static int test_incremental() {
 
     int errs = 0;
 
-    HalfKp halfKp;
+    HalfKaV2Hm halfKp;
 
     Position source_pos(source_fen);
     ChessInterface ciSource(&source_pos);

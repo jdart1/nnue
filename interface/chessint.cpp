@@ -1,4 +1,4 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2022 by Jon Dart. All Rights Reserved.
 #include "chessint.h"
 
 static const std::unordered_map<char, nnue::Piece> pieceMap = {
@@ -28,10 +28,8 @@ Position::Position(const std::string &fen)
                 kings[nnue::Black] = sq;
             else if (p == nnue::WhiteKing)
                 kings[nnue::White] = sq;
-            else {
-                assert(p != nnue::EmptyPiece);
-                locs[sq] = p;
-            }
+            assert(p != nnue::EmptyPiece);
+            locs[sq] = p;
             ++sq;
         } else {
             break;

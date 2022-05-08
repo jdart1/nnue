@@ -1,4 +1,4 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2022 by Jon Dart. All Rights Reserved.
 #ifndef _CHESS_INTERFACE_H
 #define _CHESS_INTERFACE_H
 
@@ -12,7 +12,7 @@
 // concepts, which are used if available.
 
 #include "nnue.h"
-#include <unordered_map>
+#include <map>
 
 struct DirtyState {
     nnue::Square from, to;
@@ -35,7 +35,7 @@ struct Position {
     Position *previous;
     nnue::Color stm;
     nnue::Square kings[2];
-    std::unordered_map<nnue::Square, nnue::Piece> locs;
+    std::map<nnue::Square, nnue::Piece> locs;
     nnue::Network::AccumulatorType accum;
     std::array<DirtyState, 3> dirty;
     unsigned dirty_num;

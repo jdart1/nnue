@@ -1,4 +1,4 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_NNDEFS_H
 #define _NNUE_NNDEFS_H
 
@@ -9,7 +9,7 @@ using IndexType = unsigned;
 
 static constexpr IndexType LAST_INDEX = 1000000;
 
-// Ration of NNUE output to chess evaluation
+// Ratio of NNUE output to chess evaluation
 static constexpr int FV_SCALE = 16;
 
 using IndexArray = std::array<IndexType,MAX_INDICES>;

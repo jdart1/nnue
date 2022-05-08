@@ -10,11 +10,10 @@ template <typename ChessInterface> class Evaluator {
         for (const std::pair<Square, Piece> &pair : intf) {
             const Square &sq = pair.first;
             const Piece &piece = pair.second;
-            if (piece != WhiteKing && piece != BlackKing) {
-                *it++ = nnue::Network::getIndex<kside>(intf.kingSquare(kside),
-                                                       piece, sq);
-            }
+            *it++ = nnue::Network::getIndex<kside>(intf.kingSquare(kside),
+                                                   piece, sq);
         }
+        std::cout << "--" << std::endl;
         *it = LAST_INDEX;
         return it - out.begin();
     }
@@ -30,8 +29,8 @@ template <typename ChessInterface> class Evaluator {
             Piece piece;
             Square from, to;
             intf.getDirtyState(i, from, to, piece);
-            if (isKing(piece))
-                continue;
+            //if (isKing(piece))
+            //    continue;
             if (from != InvalidSquare) {
                 removed[removed_count++] =
                     Network::getIndex<kside>(kp, piece, from);
