@@ -1,4 +1,4 @@
-// Copyright 2022 by Jon Dart. All Rights Reserved.
+// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
 #ifndef _CHESS_INTERFACE_H
 #define _CHESS_INTERFACE_H
 
@@ -9,7 +9,7 @@
 
 // We'd really like to use something like a Java interface here but
 // C++ doesn't have that, exactly. The closest thing is C++20
-// concepts, which are used if available.
+// concepts.
 
 #include "nnue.h"
 #include <map>

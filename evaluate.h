@@ -1,4 +1,4 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2022 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_EVALUATE_H
 #define _NNUE_EVALUATE_H
 
@@ -166,6 +166,7 @@ template <typename ChessInterface> class Evaluator {
 private:
     // full evaluation, update into 3rd argument
     static void updateAccum(const Network &network, ChessInterface &intf, Network::AccumulatorType &accum) {
+        const unsigned bucket = getBucket(intf);
         Color colors[] = {White, Black};
         for (Color color : colors) {
             IndexArray indices;
@@ -178,6 +179,11 @@ private:
             reinterpret_cast<Network::Layer1 *>(*(network.layers.begin()))->updateAccum(indices, targetHalf, accum);
             accum.setState(targetHalf,AccumulatorState::Computed);
         }
+    }
+
+    static unsigned getBucket(const ChessInterface &intf) {
+        // range is 0 .. 7
+        return (intf.pieceCount() - 1)/4;
     }
 
 };
