@@ -60,9 +60,15 @@ class Network {
 
     template <Color kside>
     inline static unsigned getIndex(Square kp, Piece p, Square sq) {
+#ifdef NDEBUG
         return Layer1::getIndex<kside>(kp, p, sq);
+#else
+        auto idx = Layer1::getIndex<kside>(kp, p, sq);
+        assert(idx < Layer1Rows);
+        return idx;
+#endif
     }
-    
+
     // evaluate the net (layers past the first one)
     OutputType evaluate(const AccumulatorType &accum) const {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
@@ -153,6 +159,7 @@ inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
         //        std::cout << "reading layer " << n << std::endl << std::flush;
         ++n;
         (void)layer->read(s);
+        break;
     }
 
     if (n != network.layers.size()) {

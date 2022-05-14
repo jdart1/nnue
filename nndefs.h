@@ -3,7 +3,7 @@
 #define _NNUE_NNDEFS_H
 
 static constexpr size_t DEFAULT_ALIGN = 32;
-static constexpr size_t MAX_INDICES = 32;
+static constexpr size_t MAX_INDICES = 34; // 16 pieces per side plus room for end of list marker
 
 using IndexType = unsigned;
 
