@@ -185,14 +185,26 @@ template <size_t size, typename InType, typename OutType>
 inline void vec_add(const InType *in, OutType *out) {
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
+    assert(sizeof(InType) == sizeof(OutType) && (sizeof(OutType)==2 || sizeof(OutType)==4));
     for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
+        if constexpr (sizeof(OutType)==2) {
 #ifdef AVX512
-        outp[i] = _mm512_add_epi16(outp[i], inp[i]);
+            outp[i] = _mm512_add_epi16(outp[i], inp[i]);
 #elif defined(AVX2)
-        outp[i] = _mm256_add_epi16(outp[i], inp[i]);
+            outp[i] = _mm256_add_epi16(outp[i], inp[i]);
 #elif defined(SSE2) || defined(SSSE3)
-        outp[i] = _mm_add_epi16(outp[i], inp[i]);
+            outp[i] = _mm_add_epi16(outp[i], inp[i]);
 #endif
+        }
+        else {
+#ifdef AVX512
+            outp[i] = _mm512_add_epi32(outp[i], inp[i]);
+#elif defined(AVX2)
+            outp[i] = _mm256_add_epi32(outp[i], inp[i]);
+#elif defined(SSE2) || defined(SSSE3)
+            outp[i] = _mm_add_epi32(outp[i], inp[i]);
+#endif
+        }
     }
 }
 
@@ -200,14 +212,26 @@ template <size_t size, typename InType, typename OutType>
 inline void vec_sub(const InType *in, OutType *out) {
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
+    assert(sizeof(InType) == sizeof(OutType) && (sizeof(OutType)==2 || sizeof(OutType)==4));
     for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
+        if constexpr (sizeof(OutType)==2) {
 #ifdef AVX512
-        outp[i] = _mm512_sub_epi16(outp[i], inp[i]);
+            outp[i] = _mm512_sub_epi16(outp[i], inp[i]);
 #elif defined(AVX2)
-        outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
+            outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
 #elif defined(SSE2) || defined(SSSE3)
-        outp[i] = _mm_sub_epi16(outp[i], inp[i]);
+            outp[i] = _mm_sub_epi16(outp[i], inp[i]);
 #endif
+        }
+        else {
+#ifdef AVX512
+            outp[i] = _mm512_sub_epi32(outp[i], inp[i]);
+#elif defined(AVX2)
+            outp[i] = _mm256_sub_epi32(outp[i], inp[i]);
+#elif defined(SSE2) || defined(SSSE3)
+            outp[i] = _mm_sub_epi32(outp[i], inp[i]);
+#endif
+        }
     }
 }
 
