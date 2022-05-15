@@ -153,11 +153,18 @@ static int test_halfkp() {
         std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 gen(seed1);
     std::uniform_int_distribution<int16_t> dist(-1000, 1000);
+    HalfKaV2Hm::Layer1::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
     for (size_t i = 0; i < HalfKaV2Hm::OutputSize; i++) {
         col1[i] = dist(gen);
         col2[i] = dist(gen);
         col3[i] = dist(gen);
         col4[i] = dist(gen);
+    }
+    for (size_t i = 0; i < nnue::PSQBuckets; i++) {
+        psq1[i] = dist(gen);
+        psq2[i] = dist(gen);
+        psq3[i] = dist(gen);
+        psq4[i] = dist(gen);
     }
 
     std::unordered_set<nnue::IndexType> w_expected{
@@ -253,15 +260,14 @@ static int test_halfkp() {
 
     HalfKaV2Hm::AccumulatorType accum;
 
-    halfKp.get()->setCol(4231, col1);
-    halfKp.get()->setCol(3882, col2);
-    halfKp.get()->setCol(5862, col3);
-    halfKp.get()->setCol(5925, col4);
-
-    halfKp.get()->setCol(4231, col1);
-    halfKp.get()->setCol(3882, col2);
-    halfKp.get()->setCol(5862, col3);
-    halfKp.get()->setCol(5925, col4);
+    halfKp.get()->setCol(20800, col1);
+    halfKp.get()->setCol(20804, col2);
+    halfKp.get()->setCol(18254, col3);
+    halfKp.get()->setCol(17988, col4);
+    halfKp.get()->setPSQ(20800, psq1);
+    halfKp.get()->setPSQ(20804, psq2);
+    halfKp.get()->setPSQ(18254, psq3);
+    halfKp.get()->setPSQ(17988, psq4);
 
     halfKp.get()->updateAccum(bIndices, nnue::AccumulatorHalf::Lower, accum);
     halfKp.get()->updateAccum(wIndices, nnue::AccumulatorHalf::Upper, accum);
@@ -277,11 +283,32 @@ static int test_halfkp() {
     for (size_t i = 0; i < HalfKaV2Hm::OutputSize * 2; ++i) {
         if (expected[i] != accum.getOutput()[i]) {
             ++errs;
-            std::cerr << " error at index " << int(i)
+            std::cerr << " error at accum index " << int(i)
                       << " expected: " << int(expected[i]) << " actual "
                       << accum.getOutput()[i] << std::endl;
         }
     }
+
+    // test PSQ update
+    HalfKaV2Hm::Layer1::PSQWeightType psq_expected[2][nnue::PSQBuckets];
+    for (size_t i = 0; i < nnue::PSQBuckets; ++i) {
+        psq_expected[0][i] = psq3[i] + psq4[i];
+        psq_expected[1][i] = psq1[i] + psq2[i];
+    }
+    std::vector<nnue::AccumulatorHalf> halfs = {nnue::AccumulatorHalf::Lower,
+        nnue::AccumulatorHalf::Upper};
+    for (auto half : halfs) {
+        for (size_t i = 0; i < nnue::PSQBuckets; ++i) {
+            auto expected = psq_expected[half == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
+            if (expected != accum.getPSQ(half)[i]) {
+                ++errs;
+                std::cerr << " error at psq index " << int(i)
+                          << " expected: " << expected << " actual "
+                          << accum.getPSQ(half)[i] << std::endl;
+            }
+        }
+    }
+
     return errs;
 }
 
