@@ -322,6 +322,17 @@ static int accumCompare(const HalfKaV2Hm::AccumulatorType &accum1,
             ++errs;
         }
     }
+    static const std::vector<nnue::AccumulatorHalf>halves = {
+        nnue::AccumulatorHalf::Lower,nnue::AccumulatorHalf::Upper};
+    for (auto half : halves) {
+        const auto *p2 = accum1.psqEval(half);
+        const auto *q2 = accum2.psqEval(half);
+        for (size_t i = 0; i < nnue::PSQBuckets; i++) {
+            if (*p2++ != *q2++) {
+                ++errs;
+            }
+        }
+    }
     if (errs)
         std::cout << "incremental/regular eval mismatch" << std::endl;
     return errs;
