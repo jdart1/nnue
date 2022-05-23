@@ -26,25 +26,25 @@ class Network {
                               Layer1OutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 512, 32>;
-    using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 32>;
+    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 1024, 16>;
+    using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 16, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
-    using ScaleAndClamper = ScaleAndClamp<int32_t, uint8_t, 32>;
-    using Clamper = Clamp<int16_t, uint8_t, 512>;
+    using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 16>;
+    using ScaleAndClamper2 = ScaleAndClamp<int32_t, uint8_t, 32>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
-    Network() {
-        layers.push_back(new Layer1());
-        layers.push_back(new Clamper(127));
-        layers.push_back(new Layer2());
-        layers.push_back(new ScaleAndClamper(64, 127));
-        layers.push_back(new Layer3());
-        layers.push_back(new ScaleAndClamper(64, 127));
-        layers.push_back(new Layer4());
+    Network() :  transformer(new Layer1()) {
+        for (unsigned i = 0; i < PSQBuckets; ++i) {
+            layers[i].push_back(new Layer2());
+            layers[i].push_back(new ScaleAndClamper1(16, 127));
+            layers[i].push_back(new Layer3());
+            layers[i].push_back(new ScaleAndClamper2(32, 127));
+            layers[i].push_back(new Layer4());
+        }
 #ifndef NDEBUG
         size_t bufferSize = 0;
-        for (const auto &layer : layers) {
+        for (const auto &layer : layers[0]) {
             bufferSize += layer->bufferSize();
         }
         // verify const buffer size is sufficient
@@ -53,8 +53,11 @@ class Network {
     }
 
     virtual ~Network() {
-        for (auto layer : layers) {
-            delete layer;
+        delete transformer;
+        for (unsigned i = 0; i < PSQBuckets; ++i) {
+            for (auto layer : layers[i]) {
+                delete layer;
+            }
         }
     }
 
@@ -70,7 +73,7 @@ class Network {
     }
 
     // evaluate the net (layers past the first one)
-    OutputType evaluate(const AccumulatorType &accum) const {
+    OutputType evaluate(const AccumulatorType &accum, unsigned bucket) const {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
         bool first = true;
         // propagate data through the remaining layers
@@ -83,9 +86,10 @@ class Network {
         }
         std::cout << std::endl;
 #endif
-        for (auto it = layers.begin() + 1; it != layers.end();
-             inputOffset = outputOffset, lastOffset = outputOffset,
-                  outputOffset += (*it++)->bufferSize()) {
+        for (auto it = layers[bucket].begin();
+             it != layers[bucket].end();
+             outputOffset += (*it++)->bufferSize(),
+                 inputOffset = outputOffset, lastOffset = outputOffset) {
 #ifdef NNUE_TRACE
             std::cout << "--- layer " << layer + 1 << " input=" << std::hex
                       << uintptr_t(buffer + inputOffset)
@@ -125,7 +129,8 @@ class Network {
     friend std::istream &operator>>(std::istream &i, Network &);
 
   protected:
-    std::vector<BaseLayer *> layers;
+    Layer1 *transformer;
+    std::vector<BaseLayer *> layers[PSQBuckets];
 };
 
 inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
@@ -148,23 +153,27 @@ inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
         if (!s.get(c))
             break;
     }
-    unsigned n = 0;
-    for (auto layer : network.layers) {
-        if (!s.good())
-            break;
-        // for Stockfish compatiblity: first two layers contain a hash
-        if (n < 2) {
-            (void)read_little_endian<uint32_t>(s);
+    // read hash
+    (void)read_little_endian<uint32_t>(s);
+    // read transform layer
+    (void)network.transformer->read(s);
+    // read num buckets x layers
+    for (unsigned i = 0; i < PSQBuckets; ++i) {
+        size_t n = 0;
+        for (auto layer : network.layers[i]) {
+            if (!s.good())
+                break;
+            if (n % 2 == 0) {
+                // read hash
+                (void)read_little_endian<uint32_t>(s);
+            }
+            ++n;
+            (void)layer->read(s);
         }
-        //        std::cout << "reading layer " << n << std::endl << std::flush;
-        ++n;
-        (void)layer->read(s);
-        break;
-    }
-
-    if (n != network.layers.size()) {
-        std::cerr << "network file read incomplete" << std::endl;
-        s.setstate(std::ios::failbit);
+        if (n != network.layers[i].size()) {
+            std::cerr << "network file read incomplete" << std::endl;
+            s.setstate(std::ios::failbit);
+        }
     }
     return s;
 }

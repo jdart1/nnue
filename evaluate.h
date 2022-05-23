@@ -13,7 +13,7 @@ template <typename ChessInterface> class Evaluator {
             *it++ = nnue::Network::getIndex<kside>(intf.kingSquare(kside),
                                                    piece, sq);
         }
-        std::cout << "--" << std::endl;
+        //        std::cout << "--" << std::endl;
         *it = LAST_INDEX;
         return it - out.begin();
     }
@@ -84,10 +84,8 @@ template <typename ChessInterface> class Evaluator {
         ciTarget.getAccumulator().copy_half(
             targetHalf, ciSource.getAccumulator(), sourceHalf);
         // update based on diffs
-        auto it = network.layers.begin();
-        ((Network::Layer1 *)*it)
-            ->updateAccum(added, removed, added_count, removed_count,
-                          targetHalf, ciTarget.getAccumulator());
+        network.transformer->updateAccum(added, removed, added_count, removed_count,
+                                    targetHalf, ciTarget.getAccumulator());
         ciTarget.getAccumulator().setState(targetHalf,
                                            AccumulatorState::Computed);
     }
@@ -95,14 +93,13 @@ template <typename ChessInterface> class Evaluator {
     // Full evaluation of 1/2 of the accumulator for a specified color (c)
     static void updateAccum(const Network &network, const IndexArray &indices, Color c,
                             Color sideToMove, Network::AccumulatorType &accum) {
-        auto it = network.layers.begin();
         AccumulatorHalf targetHalf =
             Network::AccumulatorType::getHalf(c, sideToMove);
         for (auto idx : indices) {
             if (idx == nnue::LAST_INDEX)
                 break;
         }
-        ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
+        network.transformer->updateAccum(indices, targetHalf, accum);
         accum.setState(targetHalf,AccumulatorState::Computed);
     }
 
@@ -147,8 +144,7 @@ template <typename ChessInterface> class Evaluator {
                 getIndices<White>(intf, indices);
             else
                 getIndices<Black>(intf, indices);
-            auto it = network.layers.begin();
-            ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
+            network.transformer->updateAccum(indices, targetHalf, accum);
         }
         accum.setState(targetHalf,AccumulatorState::Computed);
     }
@@ -160,14 +156,13 @@ template <typename ChessInterface> class Evaluator {
         // a valid Node pointer in it.
         Network::AccumulatorType accum;
         updateAccum(network, intf, accum);
-        return network.evaluate(accum);
+        return network.evaluate(accum, getBucket(intf));
     }
 
 private:
-    // full evaluation, update into 3rd argument
+    // full evaluation of accumulator, update into 3rd argument
     static void updateAccum(const Network &network, ChessInterface &intf, Network::AccumulatorType &accum) {
-        const unsigned bucket = getBucket(intf);
-        Color colors[] = {White, Black};
+        const Color colors[] = {White, Black};
         for (Color color : colors) {
             IndexArray indices;
             if (color == White)
@@ -176,7 +171,7 @@ private:
                 getIndices<Black>(intf, indices);
             AccumulatorHalf targetHalf =
               Network::AccumulatorType::getHalf(intf.sideToMove(), color);
-            reinterpret_cast<Network::Layer1 *>(*(network.layers.begin()))->updateAccum(indices, targetHalf, accum);
+            network.transformer->updateAccum(indices, targetHalf, accum);
             accum.setState(targetHalf,AccumulatorState::Computed);
         }
     }
