@@ -616,6 +616,13 @@ int main(int argc, char **argv) {
             std::cerr << "error loading " << fname << std::endl << std::flush;
         }
     }
+#ifdef NNUE_TRACE
+    const std::string fen =
+        "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
+    Position p(fen);
+    ChessInterface intf(&p);
+    nnue::Evaluator<ChessInterface>::fullEvaluate(n,intf);
+#endif    
 
     return 0;
 }

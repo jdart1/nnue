@@ -23,9 +23,16 @@ class ScaleAndClamp
                                                            _clampMax);
 #else
         for (size_t i = 0; i < size; i++) {
-            *output++ = static_cast<OutputType>(
+            output[i] = static_cast<OutputType>(
                 std::clamp<InputType>(input[i] / _scaleFactor, 0, _clampMax));
         }
+#endif
+#ifdef NNUE_TRACE
+        std::cout << "----" << std::endl;
+        for (size_t i = 0; i < size; ++i) {
+            std::cout << int(output[i]) << ' ';
+        }
+        std::cout << std::endl;
 #endif
     }
 

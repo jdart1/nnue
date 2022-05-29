@@ -12,6 +12,9 @@ template <typename InputType, typename WeightType, typename BiasType,
           size_t alignment = DEFAULT_ALIGN>
 class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
                                       outputSize, alignment> {
+
+    static constexpr size_t roundedInputSize = std::max<size_t>(32,inputSize);
+
   public:
     LinearLayer() = default;
 
@@ -21,6 +24,13 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
     virtual inline void doForward(const InputType *input,
                                   OutputType *output) const noexcept {
         dotProduct(input, output);
+#ifdef NNUE_TRACE
+        std::cout << "----" << std::endl;
+        for (unsigned i = 0; i < outputSize; ++i) {
+            std::cout << int(output[i]) << ' ';
+        }
+        std::cout << std::endl;
+#endif
     }
 
     inline void dotProduct(const InputType *input, OutputType *output) const
@@ -53,7 +63,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
             _biases[i] = 0;
         }
         for (size_t i = 0; i < outputSize; ++i) {
-            for (size_t j = 0; j < inputSize; ++j) {
+            for (size_t j = 0; j < roundedInputSize; ++j) {
                 _weights[i][j] = 0;
             }
         }
@@ -65,7 +75,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
             _biases[i] = read_little_endian<BiasType>(s);
         }
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            for (size_t j = 0; j < inputSize && s.good(); ++j) {
+            for (size_t j = 0; j < roundedInputSize && s.good(); ++j) {
                 _weights[i][j] = read_little_endian<WeightType>(s);
             }
         }
@@ -84,8 +94,9 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
     }
 
   private:
+    
     alignas(alignment) BiasType _biases[outputSize];
-    alignas(alignment) WeightType _weights[outputSize][inputSize];
+    alignas(alignment) WeightType _weights[outputSize][roundedInputSize];
 };
 
 #endif

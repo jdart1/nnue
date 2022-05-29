@@ -37,9 +37,9 @@ class Network {
     Network() :  transformer(new Layer1()) {
         for (unsigned i = 0; i < PSQBuckets; ++i) {
             layers[i].push_back(new Layer2());
-            layers[i].push_back(new ScaleAndClamper1(16, 127));
+            layers[i].push_back(new ScaleAndClamper1(64, 127));
             layers[i].push_back(new Layer3());
-            layers[i].push_back(new ScaleAndClamper2(32, 127));
+            layers[i].push_back(new ScaleAndClamper2(64, 127));
             layers[i].push_back(new Layer4());
         }
 #ifndef NDEBUG
@@ -79,23 +79,13 @@ class Network {
         // propagate data through the remaining layers
         size_t inputOffset = 0, outputOffset = 0, lastOffset = 0;
 #ifdef NNUE_TRACE
-        unsigned i = 0, layer = 0;
         std::cout << "accumulator:" << std::endl;
-        for (i = 0; i < accum.getSize(); i++) {
-            std::cout << int(accum.getOutput()[i]) << ' ';
-        }
-        std::cout << std::endl;
+        std::cout << accum << std::endl;
 #endif
         for (auto it = layers[bucket].begin();
              it != layers[bucket].end();
              outputOffset += (*it++)->bufferSize(),
                  inputOffset = outputOffset, lastOffset = outputOffset) {
-#ifdef NNUE_TRACE
-            std::cout << "--- layer " << layer + 1 << " input=" << std::hex
-                      << uintptr_t(buffer + inputOffset)
-                      << " output=" << uintptr_t(buffer + outputOffset)
-                      << std::dec << std::endl;
-#endif
             if (first) {
                 (*it)->forward(static_cast<const void *>(accum.getOutput()),
                                static_cast<void *>(buffer + outputOffset));
@@ -104,17 +94,6 @@ class Network {
                 (*it)->forward(static_cast<const void *>(buffer + inputOffset),
                                static_cast<void *>(buffer + outputOffset));
             }
-#ifdef NNUE_TRACE
-            if (layer % 2 == 0) {
-                for (i = 0; i < (*it)->bufferSize(); i++) {
-                    std::cout << int((reinterpret_cast<uint8_t *>(
-                                     buffer + outputOffset))[0])
-                              << ' ';
-                }
-                std::cout << std::endl;
-            }
-            ++layer;
-#endif
         }
 #ifdef NNUE_TRACE
         std::cout << "output: "
@@ -153,22 +132,18 @@ inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
         if (!s.get(c))
             break;
     }
-    // read hash
-    (void)read_little_endian<uint32_t>(s);
     // read transform layer
     (void)network.transformer->read(s);
     // read num buckets x layers
     for (unsigned i = 0; i < PSQBuckets; ++i) {
-        size_t n = 0;
+        // skip next 4 bytes (hash)
+        (void)read_little_endian<uint32_t>(s);
+        unsigned n = 0;
         for (auto layer : network.layers[i]) {
             if (!s.good())
                 break;
-            if (n % 2 == 0) {
-                // read hash
-                (void)read_little_endian<uint32_t>(s);
-            }
-            ++n;
             (void)layer->read(s);
+            ++n;
         }
         if (n != network.layers[i].size()) {
             std::cerr << "network file read incomplete" << std::endl;

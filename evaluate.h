@@ -156,6 +156,9 @@ template <typename ChessInterface> class Evaluator {
         // a valid Node pointer in it.
         Network::AccumulatorType accum;
         updateAccum(network, intf, accum);
+#ifdef NNUE_TRACE
+        std::cout << accum;
+#endif        
         return network.evaluate(accum, getBucket(intf));
     }
 
