@@ -6,6 +6,7 @@
 #include "layers/base.h"
 #include "layers/clamp.h"
 #include "layers/halfkav2hm.h"
+#include "layers/halfka_output.h"
 #include "layers/linear.h"
 #include "layers/scaleclamp.h"
 #include "util.h"
@@ -26,6 +27,7 @@ class Network {
                               Layer1OutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
     using AccumulatorOutputType = int16_t;
+    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType *, uint8_t, 1024>;
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 1024, 16>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 16, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
@@ -34,12 +36,12 @@ class Network {
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
-    Network() :  transformer(new Layer1()) {
+    Network() :  transformer(new Layer1()), halfKaMultClamp(new HalfKaMultClamp(7, 127)) {
         for (unsigned i = 0; i < PSQBuckets; ++i) {
             layers[i].push_back(new Layer2());
-            layers[i].push_back(new ScaleAndClamper1(64, 127));
+            layers[i].push_back(new ScaleAndClamper1(6, 127));
             layers[i].push_back(new Layer3());
-            layers[i].push_back(new ScaleAndClamper2(64, 127));
+            layers[i].push_back(new ScaleAndClamper2(6, 127));
             layers[i].push_back(new Layer4());
         }
 #ifndef NDEBUG
@@ -54,6 +56,7 @@ class Network {
 
     virtual ~Network() {
         delete transformer;
+        delete halfKaMultClamp;
         for (unsigned i = 0; i < PSQBuckets; ++i) {
             for (auto layer : layers[i]) {
                 delete layer;
@@ -75,25 +78,23 @@ class Network {
     // evaluate the net (layers past the first one)
     OutputType evaluate(const AccumulatorType &accum, unsigned bucket) const {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
-        bool first = true;
         // propagate data through the remaining layers
         size_t inputOffset = 0, outputOffset = 0, lastOffset = 0;
 #ifdef NNUE_TRACE
         std::cout << "accumulator:" << std::endl;
         std::cout << accum << std::endl;
 #endif
+        // post-process transform step
+        halfKaMultClamp->forward(static_cast<const void *>(accum.getOutput()),
+                                 static_cast<void *>(buffer + outputOffset));
+        outputOffset += halfKaMultClamp->getOutputSize();
+        // evaluate the remaining layers, in the correct bucket
         for (auto it = layers[bucket].begin();
              it != layers[bucket].end();
              outputOffset += (*it++)->bufferSize(),
-                 inputOffset = outputOffset, lastOffset = outputOffset) {
-            if (first) {
-                (*it)->forward(static_cast<const void *>(accum.getOutput()),
-                               static_cast<void *>(buffer + outputOffset));
-                first = false;
-            } else {
-                (*it)->forward(static_cast<const void *>(buffer + inputOffset),
-                               static_cast<void *>(buffer + outputOffset));
-            }
+             inputOffset = outputOffset, lastOffset = outputOffset) {
+             (*it)->forward(static_cast<const void *>(buffer + inputOffset),
+                            static_cast<void *>(buffer + outputOffset));
         }
 #ifdef NNUE_TRACE
         std::cout << "output: "
@@ -109,6 +110,7 @@ class Network {
 
   protected:
     Layer1 *transformer;
+    HalfKaMultClamp *halfKaMultClamp;
     std::vector<BaseLayer *> layers[PSQBuckets];
 };
 

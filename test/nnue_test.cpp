@@ -272,20 +272,22 @@ static int test_halfkp() {
     halfKp.get()->updateAccum(bIndices, nnue::AccumulatorHalf::Lower, accum);
     halfKp.get()->updateAccum(wIndices, nnue::AccumulatorHalf::Upper, accum);
 
-    HalfKaV2Hm::OutputType expected[HalfKaV2Hm::OutputSize * 2];
+    HalfKaV2Hm::OutputType expected[2][HalfKaV2Hm::OutputSize];
     for (size_t i = 0; i < HalfKaV2Hm::OutputSize; ++i) {
-        expected[i] = col3[i] + col4[i];
+        expected[0][i] = col3[i] + col4[i];
+        expected[1][i] = col1[i] + col2[i];
     }
-    for (size_t i = HalfKaV2Hm::OutputSize; i < HalfKaV2Hm::OutputSize * 2; ++i) {
-        expected[i] =
-            col1[i - HalfKaV2Hm::OutputSize] + col2[i - HalfKaV2Hm::OutputSize];
-    }
-    for (size_t i = 0; i < HalfKaV2Hm::OutputSize * 2; ++i) {
-        if (expected[i] != accum.getOutput()[i]) {
-            ++errs;
-            std::cerr << " error at accum index " << int(i)
-                      << " expected: " << int(expected[i]) << " actual "
-                      << accum.getOutput()[i] << std::endl;
+    static const nnue::AccumulatorHalf halves[2] = {nnue::AccumulatorHalf::Lower,
+        nnue::AccumulatorHalf::Upper};
+    for (auto h : halves) {
+        for (size_t i = 0; i < HalfKaV2Hm::OutputSize; ++i) {
+            auto exp = expected[h == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
+            if (exp != accum.getOutput(h)[i]) {
+                ++errs;
+                std::cerr << " error at accum index " << int(i)
+                          << " expected: " << int(exp) << " actual "
+                          << accum.getOutput(h)[i] << std::endl;
+            }
         }
     }
 
@@ -309,32 +311,6 @@ static int test_halfkp() {
         }
     }
 
-    return errs;
-}
-
-static int accumCompare(const HalfKaV2Hm::AccumulatorType &accum1,
-                        const HalfKaV2Hm::AccumulatorType &accum2) {
-    const HalfKaV2Hm::OutputType *p = accum1.getOutput();
-    const HalfKaV2Hm::OutputType *q = accum2.getOutput();
-    int errs = 0;
-    for (size_t i = 0; i < 2 * HalfKaV2Hm::OutputSize; i++) {
-        if (*p++ != *q++) {
-            ++errs;
-        }
-    }
-    static const std::vector<nnue::AccumulatorHalf>halves = {
-        nnue::AccumulatorHalf::Lower,nnue::AccumulatorHalf::Upper};
-    for (auto half : halves) {
-        const auto *p2 = accum1.psqEval(half);
-        const auto *q2 = accum2.psqEval(half);
-        for (size_t i = 0; i < nnue::PSQBuckets; i++) {
-            if (*p2++ != *q2++) {
-                ++errs;
-            }
-        }
-    }
-    if (errs)
-        std::cout << "incremental/regular eval mismatch" << std::endl;
     return errs;
 }
 
@@ -465,7 +441,11 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
     evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::Black);
 
     // Compare evals
-    errs += accumCompare(ciTarget.getAccumulator(), accum);
+    auto old_errs = errs;
+    errs += ciTarget.getAccumulator() != accum;
+    if (errs != old_errs) {
+        std::cerr << "accumulator mismatch after incremental eval" << std::endl;
+    }
 
     // Reset target accumulator state
     ciTarget.getAccumulator().setEmpty();
@@ -475,7 +455,12 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
     evaluator.updateAccum(network, ciTarget, nnue::Black);
 
     // Compare results again
-    errs += accumCompare(ciTarget.getAccumulator(), accum);
+    old_errs = errs;
+    errs += ciTarget.getAccumulator() != accum;
+    if (errs != old_errs) {
+        std::cerr << "accumulator mismatch after regular/incremental eval" << std::endl;
+    }
+    
     return errs;
 }
 
