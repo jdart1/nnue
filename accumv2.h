@@ -187,7 +187,7 @@ inline std::ostream & operator << (std::ostream &o, const AccumulatorV2<OutputTy
     unsigned i = 0;
     for (unsigned p = 0; p < 2; ++p) {
         for (unsigned j = 0; j < size/2; ++i, ++j) {
-            std::cout << static_cast<int>(accum._accum[i]) << ' ';
+            std::cout << static_cast<int>(accum._accum[p][i]) << ' ';
             if ((j+1)%64==0) std::cout << std::endl;
         }
     }

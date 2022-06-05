@@ -43,9 +43,6 @@ public:
         for (auto it = indices.begin(); it != indices.end() && *it != LAST_INDEX; ++it) {
             output.add_half(half,this->_weights[*it],this->_psq[*it]);
         }
-#ifdef NNUE_TRACE
-        
-#endif        
     }
 
     // Perform an incremental update

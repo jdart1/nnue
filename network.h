@@ -27,7 +27,7 @@ class Network {
                               Layer1OutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType *, uint8_t, 1024>;
+    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, 1024>;
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 1024, 16>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 16, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
@@ -84,9 +84,9 @@ class Network {
         std::cout << "accumulator:" << std::endl;
         std::cout << accum << std::endl;
 #endif
-        // post-process transform step
-        halfKaMultClamp->forward(static_cast<const void *>(accum.getOutput()),
-                                 static_cast<void *>(buffer + outputOffset));
+        // post-process accumulator
+        halfKaMultClamp->postProcessAccum(accum,
+                                          reinterpret_cast<uint8_t*>(buffer + outputOffset));
         outputOffset += halfKaMultClamp->getOutputSize();
         // evaluate the remaining layers, in the correct bucket
         for (auto it = layers[bucket].begin();
