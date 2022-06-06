@@ -13,7 +13,6 @@ template <typename ChessInterface> class Evaluator {
             *it++ = nnue::Network::getIndex<kside>(intf.kingSquare(kside),
                                                    piece, sq);
         }
-        //        std::cout << "--" << std::endl;
         *it = LAST_INDEX;
         return it - out.begin();
     }

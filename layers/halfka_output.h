@@ -25,10 +25,10 @@ class HalfKaOutput
         size_t offset = 0;
         static const AccumulatorHalf halves[2] = {AccumulatorHalf::Lower, AccumulatorHalf::Upper};
         for (size_t p = 0; p < 2; ++p, offset += size/2) {
-            const auto &input = accum.getOutput(halves[p]);
+            const InputType *input = accum.getOutput(halves[p]);
             for (size_t i = 0; i < size/2; ++i) {
-                OutputType sum0 = input[i];
-                OutputType sum1 = input[i + size/2];
+                InputType sum0 = input[i];
+                InputType sum1 = input[i + size/2];
                 sum0 = std::clamp<int>(sum0, 0, _clampMax);
                 sum1 = std::clamp<int>(sum1, 0, _clampMax);
                 output[offset + i] = static_cast<OutputType>((sum0 * sum1) >> _scaleFactor);

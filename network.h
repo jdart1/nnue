@@ -22,7 +22,6 @@ class Network {
 
     using IndexArray = std::array<int, MAX_INDICES>;
     using OutputType = int32_t;
-    using InputType = uint8_t; // output of transformer
     using Layer1 = HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, Layer1Rows,
                               Layer1OutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;

@@ -1,7 +1,7 @@
 #
 # Copyright 2020-2022 by Jon Dart. All Rights Reserved.
 #
-NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic -fsanitize=address -fsanitize=bounds-strict -DNNUE_TRACE
+NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic -fsanitize=address -fsanitize=bounds-strict
 
 #ARCH_FLAGS = -mavx2 -mbmi2 -DSIMD -DAVX2
 

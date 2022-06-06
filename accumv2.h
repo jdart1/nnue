@@ -184,11 +184,11 @@ inline std::ostream & operator << (std::ostream &o, const AccumulatorV2<OutputTy
                             WeightType, BiasType, PSQType, size,
                             psq_buckets, alignment> &accum) {
     std::cout << std::endl << "-----" << std::endl;
-    unsigned i = 0;
     for (unsigned p = 0; p < 2; ++p) {
-        for (unsigned j = 0; j < size/2; ++i, ++j) {
+        std::cout << "perspective " << p << std::endl;
+        for (unsigned i = 0; i < size; ++i) {
             std::cout << static_cast<int>(accum._accum[p][i]) << ' ';
-            if ((j+1)%64==0) std::cout << std::endl;
+            if ((i+1)%64==0) std::cout << std::endl;
         }
     }
     std::cout << std::endl << "psq: " << std::endl;
