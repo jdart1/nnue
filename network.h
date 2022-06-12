@@ -26,8 +26,8 @@ class Network {
                               Layer1OutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, 1024>;
-    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 1024, 16>;
+    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, Layer1OutputSize>;
+    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, Layer1OutputSize, 16>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 16, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
     using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 16>;
@@ -75,7 +75,7 @@ class Network {
     }
 
     // evaluate the net (layers past the first one)
-    OutputType evaluate(const AccumulatorType &accum, unsigned bucket) const {
+    int32_t evaluate(const AccumulatorType &accum, unsigned bucket) const {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
         // propagate data through the remaining layers
         size_t inputOffset = 0, outputOffset = 0, lastOffset = 0;
@@ -97,11 +97,11 @@ class Network {
         }
 #ifdef NNUE_TRACE
         std::cout << "output: "
-                  << reinterpret_cast<OutputType *>(buffer + lastOffset)[0] /
+                  << reinterpret_cast<int32_t *>(buffer + lastOffset)[0] /
                          FV_SCALE
                   << std::endl;
 #endif
-        return reinterpret_cast<OutputType *>(buffer + lastOffset)[0] /
+        return reinterpret_cast<int32_t *>(buffer + lastOffset)[0] /
                FV_SCALE;
     }
 

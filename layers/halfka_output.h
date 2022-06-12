@@ -21,7 +21,10 @@ class HalfKaOutput
     }
 
     void postProcessAccum(const AccumulatorType &accum, OutputType *output) const {
-        // TBD: SIMD support
+#ifdef SIMD
+        simd::multAndSum<InputType,OutputType,size/2>(accum.getOutput(AccumulatorHalf::Lower),output,_clampMax,_scaleFactor);
+        simd::multAndSum<InputType,OutputType,size/2>(accum.getOutput(AccumulatorHalf::Upper),output + size/2,_clampMax,_scaleFactor);
+#else
         size_t offset = 0;
         static const AccumulatorHalf halves[2] = {AccumulatorHalf::Lower, AccumulatorHalf::Upper};
         for (size_t p = 0; p < 2; ++p, offset += size/2) {
@@ -34,6 +37,7 @@ class HalfKaOutput
                 output[offset + i] = static_cast<OutputType>((sum0 * sum1) >> _scaleFactor);
             }
         }
+#endif
 #ifdef NNUE_TRACE
         std::cout << "---- halfka_output " << std::endl;
         for (size_t i = 0; i < size; ++i) {

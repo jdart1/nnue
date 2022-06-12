@@ -14,7 +14,6 @@
 
 #include "../interface/chessint.h"
 
-
 // Unit tests for nnue code
 
 template<size_t ROWS, size_t COLS>
@@ -309,7 +308,7 @@ static int test_halfkp() {
     }
 
     // test 1st layer output transformer
-    nnue::HalfKaOutput<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, HalfKaV2Hm::OutputSize> outputTransform(7,127);
+    nnue::HalfKaOutput<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, 1024> outputTransform(7,127);
 
     uint8_t out[HalfKaV2Hm::OutputSize];
     outputTransform.postProcessAccum(accum,out);

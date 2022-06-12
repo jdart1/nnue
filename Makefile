@@ -3,7 +3,7 @@
 #
 NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic -fsanitize=address -fsanitize=bounds-strict
 
-#ARCH_FLAGS = -mavx2 -mbmi2 -DSIMD -DAVX2
+ARCH_FLAGS = -mavx2 -mbmi2 -DSIMD -DAVX2
 
 #OPT = -O3
 OPT = -g
@@ -12,9 +12,9 @@ NN_LIBS := -lstdc++ -lc -lm
 
 CFLAGS := $(CFLAGS) $(NNUE_FLAGS) $(ARCH_FLAGS) $(OPT)
 
-CPP = g++
+CPP ?= g++
 
-LD = g++
+LD = $(CPP)
 
 #LDFLAGS = -fuse-ld=gold
 LDFLAGS =  -fsanitize=address -fsanitize=bounds-strict

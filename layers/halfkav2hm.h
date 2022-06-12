@@ -29,9 +29,6 @@ public:
         IndexType idx = static_cast<IndexType>(orient<kside>(sq,kp)) +
                         64 * map[p][kside] +
                         (64 * 11) * KingBuckets[orient<kside>(kp, kp)];
-        //        std::cout << int(sq) << " " << static_cast<IndexType>(orient<kside>(sq,kp)) << " " <<
-        //                        64 * map[p][kside] << " " <<
-        //                        (64 * 11) * KingBuckets[orient<kside>(kp, kp)] << " " << idx << std::endl;
         assert(idx < inputSize);
         return idx;
     }

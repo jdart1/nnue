@@ -42,8 +42,8 @@ class AccumulatorV2 {
             for (size_t i = 0; i < size; ++i) {
                 out[i] = *data[i];
             }
-        }
 #endif        
+        }
         std::memset(_psq_accum[0],'\0',sizeof(PSQType)*psq_buckets);
         std::memset(_psq_accum[1],'\0',sizeof(PSQType)*psq_buckets);
     }

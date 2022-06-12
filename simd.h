@@ -13,16 +13,22 @@ namespace simd {
     static constexpr size_t simdWidth = 512;
     static const vec_t ones512 = _mm512_set1_epi16(1);
     static const __m256i ones256 = _mm256_set1_epi16(1);
+    static const vec_t zero = _mm512_setzero_epi32();
+    static inline vec_t vec_set_16(int x) { return _mm512_set1_epi16(x); }
 #elif defined(AVX2)
     using vec_t = __m256i;
     static constexpr size_t simdWidth = 256;
     static const vec_t ones256 = _mm256_set1_epi16(1);
+    static const vec_t zero = _mm256_setzero_si256();
+    static inline vec_t vec_set_16(int x) { return _mm256_set1_epi16(x); }
 #elif defined(SSE2) || defined(SSSE3)
     using vec_t = __m128i;
     static const vec_t ones128 = _mm_set1_epi16(1);
     static constexpr size_t simdWidth = 128;
+    static const vec_t zero = _mm_setzero_si128();
+    static inline vec_t vec_set_16(int x) { return _mm2_set1_epi16(x); }
 #else
-#error must set at least one of: AVX2, SSSE3 or SSE2
+#error must set at least one of: AVX512, AVX2, SSSE3 or SSE2
 #endif
 
 template <typename T,unsigned simdWidth>
@@ -89,9 +95,9 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
 #endif
 }
 
-template <size_t inputSize, size_t outputSize>
+    template <size_t inputSize, size_t roundedInputSize, size_t outputSize>
 inline void dotProductnx32(const uint8_t *input,
-                           const int8_t weights[outputSize][inputSize],
+                           const int8_t weights[outputSize][roundedInputSize],
                            const int32_t *biases, int32_t *output) {
 #ifdef AVX2
     assert(outputSize % 32 == 0 && inputSize % 32 == 0);
@@ -314,6 +320,50 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
 #endif
     }
 #endif
+}
+
+// implements the 2nd layer of the SFv4 net, transforming the output of one half of the accumulator
+// into a uint8_t vector
+template <typename InType, typename OutType, size_t size>
+static inline void multAndSum(const InType *input, OutType *output, unsigned clampMax, unsigned shift) {
+    static_assert(size % simdWidth == 0);
+    // currently assume fixed size types
+    static_assert(sizeof(InType)==2 && sizeof(OutType)==1);
+
+    const vec_t limit = vec_set_16(clampMax);
+    const vec_t* inp0 = reinterpret_cast<const vec_t*>(input);
+    const vec_t* inp1 = reinterpret_cast<const vec_t*>(input + size);
+    vec_t* outp = reinterpret_cast<vec_t*>(output);
+
+    for (size_t i = 0; i < chunks<InType,simdWidth>(size/2); ++i) {
+#ifdef AVX512
+        const vec_t sum0a = _mm512_max_epi16(_mm512_min_epi16(inp0[i*2],limit),zero);
+        const vec_t sum0b = _mm512_max_epi16(_mm512_min_epi16(inp0[i*2+1],limit),zero);
+        const vec_t sum1a = _mm512_max_epi16(_mm512_min_epi16(inp1[i*2],limit),zero);
+        const vec_t sum1b = _mm512_max_epi16(_mm512_min_epi16(inp1[i*2+1],limit),zero);
+        const vec_t prod0 = _mm512_mullo_epi16(sum0a,sum1a);
+        const vec_t prod1 = _mm512_mullo_epi16(sum0b,sum1b);
+        vec_t compacted = _mm512_packs_epi16(_mm512_srli_epi16(prod0,7),_mm512_srli_epi16(prod1,shift));
+        out[i] = _mm512_permutexvar_epi64(_mm512_setr_epi64(0, 2, 4, 6, 1, 3, 5, 7), compacted);
+#elif defined(AVX2)
+        const vec_t sum0a = _mm256_max_epi16(_mm256_min_epi16(inp0[i*2],limit),zero);
+        const vec_t sum0b = _mm256_max_epi16(_mm256_min_epi16(inp0[i*2+1],limit),zero);
+        const vec_t sum1a = _mm256_max_epi16(_mm256_min_epi16(inp1[i*2],limit),zero);
+        const vec_t sum1b = _mm256_max_epi16(_mm256_min_epi16(inp1[i*2+1],limit),zero);
+        const vec_t prod0 = _mm256_mullo_epi16(sum0a,sum1a);
+        const vec_t prod1 = _mm256_mullo_epi16(sum0b,sum1b);
+        vec_t compacted = _mm256_packs_epi16(_mm256_srli_epi16(prod0,shift), _mm256_srli_epi16(prod1,shift));
+        outp[i] = _mm256_permute4x64_epi64(compacted, 0b11011000);
+#elif defined(SSE2)
+        const vec_t sum0a = _mm_max_epi16(_mm_min_epi16(inp0[i*2],limit),zero);
+        const vec_t sum0b = _mm_max_epi16(_mm_min_epi16(inp0[i*2+1],limit),zero);
+        const vec_t sum1a = _mm_max_epi16(_mm_min_epi16(inp1[i*2],limit),zero);
+        const vec_t sum1b = _mm_max_epi16(_mm_min_epi16(inp1[i*2+1],limit),zero);
+        const vec_t prod0 = _mm_mullo_epi16(sum0a,sum1a);
+        const vec_t prod1 = _mm_mullo_epi16(sum0b,sum1b);
+        outp[i] = _mm_packs_epi16(_mm_srli_epi16(prod0,shift),_mm_srli_epi16(prod1,shift));
+#endif
+    }
 }
 
 } // namespace simd
