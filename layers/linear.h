@@ -42,6 +42,9 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
         else if constexpr (outputSize == 32 && inputSize >= 32) {
             simd::dotProductnx32<inputSize,roundedInputSize,outputSize>(input,_weights,_biases,output);
         }
+        else if constexpr (outputSize == 16 && inputSize >= 256) {
+            simd::dotProductnx16<uint8_t,int32_t,inputSize,outputSize>(input,_weights,_biases,output);
+        }
         else
 #endif
         {

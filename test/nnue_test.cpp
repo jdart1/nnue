@@ -580,7 +580,7 @@ int main(int argc, char **argv) {
     nnue::Network n;
 
     int errs = 0;
-    errs += test_linear<512,32>();
+    errs += test_linear<1024,16>();
     errs += test_linear<32,32>();
     errs += test_linear<32,1>();
     errs += test_halfkp();
