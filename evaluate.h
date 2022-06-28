@@ -7,7 +7,7 @@ template <typename ChessInterface> class Evaluator {
     template <Color kside>
     static size_t getIndices(const ChessInterface &intf, IndexArray &out) {
         IndexArray::iterator it = out.begin();
-        for (const std::pair<Square, Piece> &pair : intf) {
+        for (const auto &pair : intf) {
             const Square &sq = pair.first;
             const Piece &piece = pair.second;
             if (piece != WhiteKing && piece != BlackKing) {
