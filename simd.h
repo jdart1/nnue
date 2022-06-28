@@ -26,7 +26,7 @@ namespace simd {
     static const vec_t ones128 = _mm_set1_epi16(1);
     static constexpr size_t simdWidth = 128;
     static const vec_t zero = _mm_setzero_si128();
-    static inline vec_t vec_set_16(int x) { return _mm2_set1_epi16(x); }
+    static inline vec_t vec_set_16(int x) { return _mm_set1_epi16(x); }
 #else
 #error must set at least one of: AVX512, AVX2, SSSE3 or SSE2
 #endif
@@ -95,25 +95,33 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
 #endif
 }
 
-template <size_t inputSize, size_t roundedInputSize, size_t outputSize>
-inline void dotProductnx32(const uint8_t *input,
-                           const int8_t weights[outputSize][roundedInputSize],
-                           const int32_t *biases, int32_t *output) {
 #ifdef AVX2
-    assert(outputSize % 32 == 0 && inputSize % 32 == 0);
+auto inline m256_add_dpbusd_epi32(vec_t& acc, vec_t a, vec_t b) {
+#ifdef VNNI
+    acc = _mm256_dpbusd_epi32(acc, a, b);
+#else
+    __m256i product0 = _mm256_maddubs_epi16(a, b);
+    product0 = _mm256_madd_epi16(product0, ones256);
+    acc = _mm256_add_epi32(acc, product0);
+#endif
+}
+#endif
+
+// dot product, input of at least 32 to output > 1
+// input uint_8t, output int32_t    
+template <size_t inputSize, size_t roundedInputSize, size_t outputSize>
+inline void dotProductnxn(const uint8_t *input,
+                          const int8_t weights[outputSize][roundedInputSize],
+                          const int32_t *biases, int32_t *output) {
+#ifdef AVX2
+    assert(inputSize % 32 == 0);
     std::memcpy(output, biases, outputSize * 4);
     for (unsigned i = 0; i < outputSize; i++) {
         __m256i prod = _mm256_setzero_si256();
         const __m256i *w = reinterpret_cast<const __m256i *>(weights[i]);
         for (unsigned j = 0; j < inputSize; j += 32) {
             const __m256i *inp = reinterpret_cast<const __m256i *>(&input[j]);
-#ifdef VNNI
-            prod = _mm256_dpbusd_epi32(prod, inp[0], w[j / 32]);
-#else
-            __m256i x = _mm256_maddubs_epi16(inp[0], w[j / 32]);
-            x = _mm256_madd_epi16(x, ones256);
-            prod = _mm256_add_epi32(prod, x);
-#endif
+            m256_add_dpbusd_epi32(prod, inp[0], w[j / 32]);
         }
         __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod),
                                     _mm256_extracti128_si256(prod, 1));
@@ -168,69 +176,6 @@ inline void dotProductnx32(const uint8_t *input,
         output[i] = _mm_cvtsi128_si32(sum);
     }
 #endif
-}
-
-[[maybe_unused]] auto inline m256_add_dpbusd_epi32(vec_t& acc, vec_t a, vec_t b) {
-#ifdef VNNI
-    acc = _mm256_dpbusd_epi32(acc, a, b);
-#else
-    __m256i Ones256 = _mm256_set1_epi16(1);
-    __m256i product0 = _mm256_maddubs_epi16(a, b);
-    product0 = _mm256_madd_epi16(product0, Ones256);
-    acc = _mm256_add_epi32(acc, product0);
-#endif
-}
-
-[[maybe_unused]] __m128i inline m256_haddx4(vec_t sum0, vec_t sum1, vec_t sum2, vec_t sum3) {
-    sum0 = _mm256_hadd_epi32(sum0, sum1);
-    sum2 = _mm256_hadd_epi32(sum2, sum3);
-    sum0 = _mm256_hadd_epi32(sum0, sum2);
-
-    __m128i sum128lo = _mm256_castsi256_si128(sum0);
-    __m128i sum128hi = _mm256_extracti128_si256(sum0, 1);
-
-    return _mm_add_epi32(sum128lo, sum128hi);
-}
-
-// dot product for larger n, output to size 16 vector
-template <typename InputType, typename OutputType, size_t inputSize, size_t outputSize>
-inline void dotProductnx16(const InputType *input,
-                           const int8_t weights[outputSize][inputSize],
-                           const OutputType *biases, OutputType *output) {
-    static_assert(sizeof(OutputType) == 4 && sizeof(InputType)==1); // currently optimized for this
-    // size of input/output blocks in bytes
-    static constexpr unsigned OutputBlockSize = simdWidth / (8*sizeof(OutputType));
-    static constexpr unsigned InputBlockSize = simdWidth / (8*sizeof(InputType));
-    static constexpr unsigned OutputBlocks = outputSize / OutputBlockSize;
-    static constexpr unsigned InputBlocks = inputSize / InputBlockSize;
-
-#ifdef AVX2
-    std::memcpy(output, biases, outputSize * sizeof(OutputType));
-
-    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
-
-    __m128i *outp = reinterpret_cast<__m128i*>(output);
-
-    alignas(32) vec_t tmp[OutputBlocks];
-
-    for (size_t i = 0, inOffset = 0; i < InputBlocks; ++i, inOffset += InputBlockSize) {
-        const vec_t in = inp[i];
-        for (size_t j = 0, outOffset = 0; j < OutputBlocks; ++j, outOffset += OutputBlockSize) {
-            const vec_t w = *(reinterpret_cast<const vec_t*>(&weights[outOffset][inOffset]));
-            m256_add_dpbusd_epi32(tmp[j], in, w);
-        }
-    }
-
-    // combine accumulated partial sums into output
-    for (size_t i = 0; i < OutputBlocks / 4; ++i) {
-        outp[i] = _mm_add_epi32(m256_haddx4(
-            tmp[i * 4 + 0],
-            tmp[i * 4 + 1],
-            tmp[i * 4 + 2],
-            tmp[i * 4 + 3]),outp[i]);
-    }
-#endif
-
 }
 
 template <size_t size, typename DataType>
