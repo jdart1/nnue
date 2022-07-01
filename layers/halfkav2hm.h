@@ -28,7 +28,7 @@ public:
         assert(p != EmptyPiece);
         IndexType idx = static_cast<IndexType>(orient<kside>(sq,kp)) +
                         64 * map[p][kside] +
-                        (64 * 11) * KingBuckets[orient<kside>(kp, kp)];
+                        (64 * 11) * kingBucket(orient<kside>(kp, kp));
         assert(idx < inputSize);
         return idx;
     }
@@ -101,19 +101,13 @@ private:
     // Rotate positions so that the King is always on files e..h
     template <Color perspective>
     inline static Square orient(Square s, Square ksq) {
-        return Square(int(s) ^ (bool(perspective) * 56) ^ ((ksq % 8 < 4) * 7));
+        Square s2 = int(s)  ^ ((ksq % 8 < 4) * 7);
+        return perspective ? s2 ^ 56 : s2;
     }
 
-    static constexpr int KingBuckets[64] = {
-      -1, -1, -1, -1, 31, 30, 29, 28,
-      -1, -1, -1, -1, 27, 26, 25, 24,
-      -1, -1, -1, -1, 23, 22, 21, 20,
-      -1, -1, -1, -1, 19, 18, 17, 16,
-      -1, -1, -1, -1, 15, 14, 13, 12,
-      -1, -1, -1, -1, 11, 10,  9,  8,
-      -1, -1, -1, -1,  7,  6,  5,  4,
-      -1, -1, -1, -1,  3,  2,  1,  0
-    };
+    inline static Square  kingBucket(Square s) {
+        return ((63-s)%4 + 2*(63-s)/2)/2;
+    }
 
     static constexpr unsigned map[16][2] = {
         {0, 0}, {0, 1}, {2, 3}, {4, 5}, {6, 7}, {8, 9}, {10, 10}, {0, 0},

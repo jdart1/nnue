@@ -100,24 +100,42 @@ auto inline m256_add_dpbusd_epi32(vec_t& acc, vec_t a, vec_t b) {
 #ifdef VNNI
     acc = _mm256_dpbusd_epi32(acc, a, b);
 #else
-    __m256i product0 = _mm256_maddubs_epi16(a, b);
-    product0 = _mm256_madd_epi16(product0, ones256);
-    acc = _mm256_add_epi32(acc, product0);
+    __m256i x = _mm256_maddubs_epi16(a, b);
+    x = _mm256_madd_epi16(x, ones256);
+    acc = _mm256_add_epi32(acc, x);
 #endif
 }
 #endif
 
 // dot product, input of at least 32 to output > 1
-// input uint_8t, output int32_t    
+// input uint_8t, output int32_t
 template <size_t inputSize, size_t roundedInputSize, size_t outputSize>
 inline void dotProductnxn(const uint8_t *input,
                           const int8_t weights[outputSize][roundedInputSize],
                           const int32_t *biases, int32_t *output) {
+#ifdef AVX512
+    if constexpr (inputSize >= 64 && inputSize % 64 == 0) {
+        std::memcpy(output, biases, outputSize * 4);
+        for (unsigned i = 0; i < outputSize; i++) {
+            vec_t prod = zero;
+            const vec_t *w = reinterpret_cast<const vec_t *>(weights[i]);
+            for (unsigned j = 0; j < inputSize; j += 64) {
+                const vec_t *inp = reinterpret_cast<vec_t *>(&input[j]);
+                _mm512_dpbusd_epi32(prod, inp[0], w[j / 64]);
+            }
+            __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod),
+                                        _mm256_extracti128_si256(prod, 1));
+            sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
+            output[i] += _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
+        }
+        return;
+    }
+#endif
 #ifdef AVX2
     assert(inputSize % 32 == 0);
     std::memcpy(output, biases, outputSize * 4);
     for (unsigned i = 0; i < outputSize; i++) {
-        __m256i prod = _mm256_setzero_si256();
+        __m256i prod = zero;
         const __m256i *w = reinterpret_cast<const __m256i *>(weights[i]);
         for (unsigned j = 0; j < inputSize; j += 32) {
             const __m256i *inp = reinterpret_cast<const __m256i *>(&input[j]);
