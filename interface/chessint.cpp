@@ -1,5 +1,6 @@
 // Copyright 2022 by Jon Dart. All Rights Reserved.
 #include "chessint.h"
+#include <unordered_map>
 
 static const std::unordered_map<char, nnue::Piece> pieceMap = {
     {'p', nnue::BlackPawn}, {'n', nnue::BlackKnight}, {'b', nnue::BlackBishop},

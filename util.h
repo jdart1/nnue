@@ -15,7 +15,7 @@ static uint64_t to_little_endian64(uint64_t x) { return (x); }
 #endif
 #else
 // Somewhat less general endian support
-#ifdef _MSC_VER
+#if defined (_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
 // assume little-endian
 static uint16_t to_little_endian16(uint16_t x) { return (x); }
 static uint32_t to_little_endian32(uint32_t x) { return (x); }

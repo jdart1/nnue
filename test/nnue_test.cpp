@@ -47,11 +47,15 @@ static int test_linear() {
 
     nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS> layer;
 
-    std::string tmp_name(std::tmpnam(nullptr));
+    std::string tmp_name("tmp");
 
-    std::ofstream outfile(tmp_name, std::ios::binary);
+    std::ofstream outfile(tmp_name, std::ios::binary | std::ios::trunc);
     outfile.write(reinterpret_cast<char *>(buf.get()),
                   bufSize);
+    if (outfile.bad()) {
+      ++errs;
+      std::cerr << "error writing stream" << std::endl;
+    }
     outfile.close();
 
     std::ifstream infile(tmp_name, std::ios::binary);
@@ -69,6 +73,7 @@ static int test_linear() {
     int tmp = errs;
     for (size_t i = 0; i < COLS; i++) {
         errs += (layer.getBiases()[i] != biases[i]);
+	if (layer.getBiases()[i] != biases[i]) std::cerr << layer.getBiases()[i] << ' ' << biases[i] << std::endl;
     }
     for (size_t i = 0; i < COLS; i++) {
         // get weights for output column

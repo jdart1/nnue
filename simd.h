@@ -95,8 +95,20 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
 #endif
 }
 
+#ifdef AVX512
+[[maybe_unused]] auto inline m512_add_dpbusd_epi32(__m512i& acc, __m512i a, __m512i b) {
+#ifdef AVX512_VNNI
+    acc = _mm512_dpbusd_epi32(acc, a, b);
+#else
+    __m512i x = _mm512_maddubs_epi16(a, b);
+    x = _mm512_madd_epi16(x, ones512);
+    acc = _mm512_add_epi32(acc, x);
+#endif
+}
+#endif
+
 #ifdef AVX2
-auto inline m256_add_dpbusd_epi32(vec_t& acc, vec_t a, vec_t b) {
+[[maybe_unused]] auto inline m256_add_dpbusd_epi32(__m256i& acc, __m256i a, __m256i b) {
 #ifdef VNNI
     acc = _mm256_dpbusd_epi32(acc, a, b);
 #else
@@ -104,6 +116,13 @@ auto inline m256_add_dpbusd_epi32(vec_t& acc, vec_t a, vec_t b) {
     x = _mm256_madd_epi16(x, ones256);
     acc = _mm256_add_epi32(acc, x);
 #endif
+}
+
+inline int32_t m256_hadd_8x32(__m256i prod) {
+  __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod),
+                              _mm256_extracti128_si256(prod, 1));
+  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
+  return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
 }
 #endif
 
@@ -120,13 +139,14 @@ inline void dotProductnxn(const uint8_t *input,
             vec_t prod = zero;
             const vec_t *w = reinterpret_cast<const vec_t *>(weights[i]);
             for (unsigned j = 0; j < inputSize; j += 64) {
-                const vec_t *inp = reinterpret_cast<vec_t *>(&input[j]);
-                _mm512_dpbusd_epi32(prod, inp[0], w[j / 64]);
+                const vec_t *inp = reinterpret_cast<const vec_t *>(&input[j]);
+                m512_add_dpbusd_epi32(prod, inp[0], w[j / 64]);
             }
-            __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod),
-                                        _mm256_extracti128_si256(prod, 1));
-            sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
-            output[i] += _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
+	    output[i] += _mm512_reduce_add_epi32(prod);
+	    /*
+	    __m256i sum = _mm256_add_epi32(_mm512_castsi512_si256(prod),_mm512_extracti32x8_epi32(prod, 1));
+	   output[i] += m256_hadd_8x32(sum);
+	    */
         }
         return;
     }
@@ -135,16 +155,13 @@ inline void dotProductnxn(const uint8_t *input,
     assert(inputSize % 32 == 0);
     std::memcpy(output, biases, outputSize * 4);
     for (unsigned i = 0; i < outputSize; i++) {
-        __m256i prod = zero;
+        __m256i prod = _mm256_setzero_si256();
         const __m256i *w = reinterpret_cast<const __m256i *>(weights[i]);
         for (unsigned j = 0; j < inputSize; j += 32) {
             const __m256i *inp = reinterpret_cast<const __m256i *>(&input[j]);
             m256_add_dpbusd_epi32(prod, inp[0], w[j / 32]);
         }
-        __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod),
-                                    _mm256_extracti128_si256(prod, 1));
-        sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
-        output[i] += _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
+        output[i] += m256_hadd_8x32(prod);
     }
 #elif defined(SSSE3)
     const vec_t *inp = reinterpret_cast<const vec_t *>(input);
@@ -215,55 +232,109 @@ inline void vec_copy(const DataType *in,DataType *out) {
 
 template <size_t size, typename InType, typename OutType>
 inline void vec_add(const InType *in, OutType *out) {
-    const vec_t *inp = reinterpret_cast<const vec_t *>(in);
-    vec_t *outp = reinterpret_cast<vec_t *>(out);
     assert(sizeof(InType) == sizeof(OutType) && (sizeof(OutType)==2 || sizeof(OutType)==4));
-    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
-        if constexpr (sizeof(OutType)==2) {
-#ifdef AVX512
-            outp[i] = _mm512_add_epi16(outp[i], inp[i]);
-#elif defined(AVX2)
-            outp[i] = _mm256_add_epi16(outp[i], inp[i]);
-#elif defined(SSE2) || defined(SSSE3)
-            outp[i] = _mm_add_epi16(outp[i], inp[i]);
+    unsigned width = simdWidth;
+    size_t blocks;
+    while ((blocks = (8 * size * sizeof(OutType)) / width) == 0 && width > 128) {
+       // special case where we cannot use the widest SIMD instruction
+       width /= 2;
+    }
+    assert(blocks);
+    switch(width) {
+ #ifdef AVX512
+    case 512: {
+      const vec_t *inp = reinterpret_cast<const vec_t *>(in);
+      vec_t *outp = reinterpret_cast<vec_t *>(out);
+      for (size_t i = 0; i < blocks; ++i) {
+	if constexpr (sizeof(OutType)==2)
+           outp[i] = _mm512_add_epi16(outp[i], inp[i]);
+	else
+           outp[i] = _mm512_add_epi32(outp[i], inp[i]);
+      }
+      break;
+    }
 #endif
-        }
-        else {
-#ifdef AVX512
-            outp[i] = _mm512_add_epi32(outp[i], inp[i]);
-#elif defined(AVX2)
-            outp[i] = _mm256_add_epi32(outp[i], inp[i]);
-#elif defined(SSE2) || defined(SSSE3)
-            outp[i] = _mm_add_epi32(outp[i], inp[i]);
+#ifdef AVX2
+    case 256: {
+      const __m256i *inp = reinterpret_cast<const __m256i *>(in);
+      __m256i *outp = reinterpret_cast<__m256i *>(out);
+      for (size_t i = 0; i < blocks; ++i) {
+	if constexpr (sizeof(OutType)==2)
+           outp[i] = _mm256_add_epi16(outp[i], inp[i]);
+	else
+           outp[i] = _mm256_add_epi32(outp[i], inp[i]);
+      }
+      break;
+    }
 #endif
-        }
+    case 128: {
+      const __m128i *inp = reinterpret_cast<const __m128i *>(in);
+      __m128i *outp = reinterpret_cast<__m128i *>(out);
+      for (size_t i = 0; i < blocks; ++i) {
+	if constexpr (sizeof(OutType)==2)
+           outp[i] = _mm_add_epi16(outp[i], inp[i]);
+	else
+           outp[i] = _mm_add_epi32(outp[i], inp[i]);
+      }
+      break;
+    }
+    default:
+      assert(0);
+      break;
     }
 }
 
 template <size_t size, typename InType, typename OutType>
 inline void vec_sub(const InType *in, OutType *out) {
-    const vec_t *inp = reinterpret_cast<const vec_t *>(in);
-    vec_t *outp = reinterpret_cast<vec_t *>(out);
     assert(sizeof(InType) == sizeof(OutType) && (sizeof(OutType)==2 || sizeof(OutType)==4));
-    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
-        if constexpr (sizeof(OutType)==2) {
-#ifdef AVX512
-            outp[i] = _mm512_sub_epi16(outp[i], inp[i]);
-#elif defined(AVX2)
-            outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
-#elif defined(SSE2) || defined(SSSE3)
-            outp[i] = _mm_sub_epi16(outp[i], inp[i]);
+    size_t blocks;
+    unsigned width = simdWidth;
+    while ((blocks = (8 * size * sizeof(OutType)) / width) == 0 && width > 128) {
+       // special case where we cannot use the widest SIMD instruction
+       width /= 2;
+    }
+    assert(blocks);
+    switch(width) {
+ #ifdef AVX512
+    case 512: {
+      const vec_t *inp = reinterpret_cast<const vec_t *>(in);
+      vec_t *outp = reinterpret_cast<vec_t *>(out);
+      for (size_t i = 0; i < blocks; ++i) {
+	if constexpr (sizeof(OutType)==2)
+           outp[i] = _mm512_sub_epi16(outp[i], inp[i]);
+	else
+           outp[i] = _mm512_sub_epi32(outp[i], inp[i]);
+      }
+      break;
+    }
 #endif
-        }
-        else {
-#ifdef AVX512
-            outp[i] = _mm512_sub_epi32(outp[i], inp[i]);
-#elif defined(AVX2)
-            outp[i] = _mm256_sub_epi32(outp[i], inp[i]);
-#elif defined(SSE2) || defined(SSSE3)
-            outp[i] = _mm_sub_epi32(outp[i], inp[i]);
+#ifdef AVX2
+    case 256: {
+      const __m256i *inp = reinterpret_cast<const __m256i *>(in);
+      __m256i *outp = reinterpret_cast<__m256i *>(out);
+      for (size_t i = 0; i < blocks; ++i) {
+	if constexpr (sizeof(OutType)==2)
+           outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
+	else
+           outp[i] = _mm256_sub_epi32(outp[i], inp[i]);
+      }
+      break;
+    }
 #endif
-        }
+    case 128: {
+      const __m128i *inp = reinterpret_cast<const __m128i *>(in);
+      __m128i *outp = reinterpret_cast<__m128i *>(out);
+      for (size_t i = 0; i < blocks; ++i) {
+	if constexpr (sizeof(OutType)==2)
+           outp[i] = _mm_sub_epi16(outp[i], inp[i]);
+	else
+           outp[i] = _mm_sub_epi32(outp[i], inp[i]);
+      }
+      break;
+    }
+    default:
+      assert(0);
+      break;
     }
 }
 
@@ -370,7 +441,7 @@ static inline void multAndSum(const InType *input, OutType *output, unsigned cla
         const vec_t prod0 = _mm512_mullo_epi16(sum0a,sum1a);
         const vec_t prod1 = _mm512_mullo_epi16(sum0b,sum1b);
         vec_t compacted = _mm512_packs_epi16(_mm512_srli_epi16(prod0,7),_mm512_srli_epi16(prod1,shift));
-        out[i] = _mm512_permutexvar_epi64(_mm512_setr_epi64(0, 2, 4, 6, 1, 3, 5, 7), compacted);
+        outp[i] = _mm512_permutexvar_epi64(_mm512_setr_epi64(0, 2, 4, 6, 1, 3, 5, 7), compacted);
 #elif defined(AVX2)
         const vec_t sum0a = _mm256_max_epi16(_mm256_min_epi16(inp0[i*2],limit),zero);
         const vec_t sum0b = _mm256_max_epi16(_mm256_min_epi16(inp0[i*2+1],limit),zero);
