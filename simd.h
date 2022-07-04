@@ -121,7 +121,7 @@ inline void dotProductnx32(const uint8_t *input,
     if constexpr (inputSize >= 64 && inputSize % 64 == 0) {
         std::memcpy(output, biases, outputSize * 4);
         for (unsigned i = 0; i < outputSize; i++) {
-            vec_t prod = zero;
+  	    vec_t prod = _mm512_setzero_si512();
             const vec_t *w = reinterpret_cast<const vec_t *>(weights[i]);
             for (unsigned j = 0; j < inputSize; j += 64) {
                 const vec_t *inp = reinterpret_cast<const vec_t *>(&input[j]);

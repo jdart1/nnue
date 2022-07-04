@@ -26,12 +26,13 @@ MIT Licensed.
 
 Requires C++-17. The Makefile (Gnu Make) builds a test executable. -DSIMD must be specificed to select SIMD optimizations. If SIMD is set then tthe following flags can be set to select the desired instruction set(s). They can be combined and are utilized in the following order of precedence.
 
-1. AVX512
-2. VNNI (in addition to AVX2)
-3. AVX2
-4. SSE41 (in addition to SSSE3)
-5. SSSE3 (assumes SSE2 also present)
-6. SSE2
+1. AVX512_VNNI (in addition to AVX512)
+2. AVX512
+3. VNNI (in addition to AVX2)
+4. AVX2
+5. SSE41 (in addition to SSSE3)
+6. SSSE3 (assumes SSE2 also present)
+7. SSE2
 
 If -DSIMD is enabled, at least one of: AVX2, SSSE3 or SSE2 must also be selected.
 

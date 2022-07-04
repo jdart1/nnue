@@ -47,11 +47,21 @@ static int test_linear() {
 
     nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS> layer;
 
+#if defined(__MINGW32__) || defined(__MINGW64__)
+    std::string tmp_name("XXX");
+#else
     std::string tmp_name(std::tmpnam(nullptr));
+#endif
 
-    std::ofstream outfile(tmp_name, std::ios::binary);
+    std::ofstream outfile(tmp_name, std::ios::binary | std::ios::trunc);
     outfile.write(reinterpret_cast<char *>(buf.get()),
                   bufSize);
+    if (outfile.bad()) {
+      std::cerr << "error writing temp file" << std::endl;
+      outfile.close();
+      std::remove(tmp_name.c_str());
+      return 1;
+    }
     outfile.close();
 
     std::ifstream infile(tmp_name, std::ios::binary);
@@ -62,8 +72,11 @@ static int test_linear() {
     if (infile.bad()) {
         std::cerr << "error reading linear layer" << std::endl;
         ++errs;
+	infile.close();
+	std::remove(tmp_name.c_str());
         return errs;
     }
+    infile.close();
 
     // verify layer was read
     int tmp = errs;
@@ -103,6 +116,7 @@ static int test_linear() {
     }
     if (errs - tmp > 0)
         std::cerr << "errors computing dot product " << ROWS << "x" << COLS << std::endl;
+    std::remove(tmp_name.c_str());
     return errs;
 }
 
