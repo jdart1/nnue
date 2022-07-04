@@ -30,6 +30,30 @@ static inline size_t chunks(unsigned len) {
     return (len * 8 * sizeof(T)) / simdWidth;
 }
 
+#ifdef AVX512
+void inline mm512_add_dpbusd_epi32(__m512i& acc, __m512i a, __m512i b) {
+#ifdef AVX512_VNNI
+    acc = _mm512_dpbusd_epi32(acc, a, b);
+#else
+    __m512i x = _mm512_maddubs_epi16(a, b);
+    x = _mm512_madd_epi16(x, ones512);
+    acc = _mm512_add_epi32(acc, x);
+#endif
+}
+#endif
+
+#ifdef AVX2
+[[maybe_unused]] void inline mm256_add_dpbusd_epi32(__m256i& acc, __m256i a, __m256i b) {
+#ifdef VNNI
+    acc = _mm256_dpbusd_epi32(acc, a, b);
+#else
+    __m256i x = _mm256_maddubs_epi16(a, b);
+    x = _mm256_madd_epi16(x, ones256);
+    acc = _mm256_add_epi32(acc, x);
+#endif
+}
+#endif
+
 static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
                                   const int32_t *biases, int32_t *output) {
     // No use using AVX512 here because the input is only 32x8 = 256 bits
@@ -93,6 +117,21 @@ template <size_t inputSize, size_t outputSize>
 inline void dotProductnx32(const uint8_t *input,
                            const int8_t weights[outputSize][inputSize],
                            const int32_t *biases, int32_t *output) {
+#ifdef AVX512
+    if constexpr (inputSize >= 64 && inputSize % 64 == 0) {
+        std::memcpy(output, biases, outputSize * 4);
+        for (unsigned i = 0; i < outputSize; i++) {
+            vec_t prod = zero;
+            const vec_t *w = reinterpret_cast<const vec_t *>(weights[i]);
+            for (unsigned j = 0; j < inputSize; j += 64) {
+                const vec_t *inp = reinterpret_cast<const vec_t *>(&input[j]);
+                mm512_add_dpbusd_epi32(prod, inp[0], w[j / 64]);
+            }
+	    output[i] += _mm512_reduce_add_epi32(prod);
+        }
+        return;
+    }
+#endif
 #ifdef AVX2
     assert(outputSize % 32 == 0 && inputSize % 32 == 0);
     std::memcpy(output, biases, outputSize * 4);
@@ -101,13 +140,7 @@ inline void dotProductnx32(const uint8_t *input,
         const __m256i *w = reinterpret_cast<const __m256i *>(weights[i]);
         for (unsigned j = 0; j < inputSize; j += 32) {
             const __m256i *inp = reinterpret_cast<const __m256i *>(&input[j]);
-#ifdef VNNI
-            prod = _mm256_dpbusd_epi32(prod, inp[0], w[j / 32]);
-#else
-            __m256i x = _mm256_maddubs_epi16(inp[0], w[j / 32]);
-            x = _mm256_madd_epi16(x, ones256);
-            prod = _mm256_add_epi32(prod, x);
-#endif
+            mm256_add_dpbusd_epi32(prod, inp[0], w[j / 32]);
         }
         __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod),
                                     _mm256_extracti128_si256(prod, 1));
