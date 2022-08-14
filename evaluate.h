@@ -7,7 +7,7 @@ template <typename ChessInterface> class Evaluator {
     template <Color kside>
     static size_t getIndices(const ChessInterface &intf, IndexArray &out) {
         IndexArray::iterator it = out.begin();
-        for (auto &pair : intf) {
+        for (const auto &pair : intf) {
             const Square &sq = pair.first;
             const Piece &piece = pair.second;
             *it++ = nnue::Network::getIndex<kside>(intf.kingSquare(kside),
@@ -161,6 +161,11 @@ template <typename ChessInterface> class Evaluator {
         return network.evaluate(accum, getBucket(intf));
     }
 
+    static unsigned getBucket(const ChessInterface &intf) {
+        // range is 0 .. 7
+        return (intf.pieceCount() - 1)/4;
+    }
+
 private:
     // full evaluation of accumulator, update into 3rd argument
     static void updateAccum(const Network &network, ChessInterface &intf, Network::AccumulatorType &accum) {
@@ -176,11 +181,6 @@ private:
             network.transformer->updateAccum(indices, targetHalf, accum);
             accum.setState(targetHalf,AccumulatorState::Computed);
         }
-    }
-
-    static unsigned getBucket(const ChessInterface &intf) {
-        // range is 0 .. 7
-        return (intf.pieceCount() - 1)/4;
     }
 
 };

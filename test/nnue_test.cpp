@@ -569,7 +569,7 @@ static int test_scale_and_clamp() {
     int errs = 0;
     constexpr unsigned SIZE = 32;
     constexpr int CLAMP_MAX = 127;
-    constexpr int SCALE = 64;
+    constexpr int SCALE = 6;
     using InputType = int32_t;
     using OutputType = uint8_t;
     using ScaleAndClamper = nnue::ScaleAndClamp<InputType, OutputType, SIZE>;
@@ -581,7 +581,7 @@ static int test_scale_and_clamp() {
 
     for (unsigned i = 0; i < SIZE; i++) {
         input[i] = -9000 + 900*std::min<unsigned>(i,10) + i;
-        output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i]/SCALE,0,CLAMP_MAX));
+        output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i] >> SCALE,0,CLAMP_MAX));
     }
     std::memset(output2,'\0',SIZE*sizeof(OutputType));
     c.doForward(input,output2);
