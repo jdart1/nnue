@@ -156,7 +156,9 @@ template <typename ChessInterface> class Evaluator {
         Network::AccumulatorType accum;
         updateAccum(network, intf, accum);
 #ifdef NNUE_TRACE
-        std::cout << accum;
+        std::cout << "full evaluate" << std::endl;
+        std::cout << "bucket=" << getBucket(intf) << std::endl;
+        std::cout << accum << std::endl;;
 #endif        
         return network.evaluate(accum, getBucket(intf));
     }

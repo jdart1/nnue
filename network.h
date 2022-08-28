@@ -44,7 +44,7 @@ class Network {
             layers[i].push_back(new Layer4());
         }
 #ifndef NDEBUG
-        size_t bufferSize = 0;
+        size_t bufferSize = halfKaMultClamp->getOutputSize();
         for (const auto &layer : layers[0]) {
             bufferSize += layer->bufferSize();
         }
@@ -78,30 +78,35 @@ class Network {
     int32_t evaluate(const AccumulatorType &accum, unsigned bucket) const {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
         // propagate data through the remaining layers
-        size_t inputOffset = 0, outputOffset = 0, lastOffset = 0;
+        size_t inputOffset = 0, outputOffset = 0;
 #ifdef NNUE_TRACE
+        std::cout << "bucket=" << bucket << std::endl;
         std::cout << "accumulator:" << std::endl;
         std::cout << accum << std::endl;
 #endif
         // post-process accumulator
         halfKaMultClamp->postProcessAccum(accum,
-                                          reinterpret_cast<uint8_t*>(buffer + outputOffset));
-        outputOffset += halfKaMultClamp->getOutputSize();
+                                          reinterpret_cast<uint8_t*>(buffer));
         // evaluate the remaining layers, in the correct bucket
-        for (auto it = layers[bucket].begin();
-             it != layers[bucket].end();
-             outputOffset += (*it++)->bufferSize(),
-             inputOffset = outputOffset, lastOffset = outputOffset) {
-             (*it)->forward(static_cast<const void *>(buffer + inputOffset),
-                            static_cast<void *>(buffer + outputOffset));
+        bool first = true;
+        for (const auto &it : layers[bucket]) {
+             if (first)
+                 outputOffset += halfKaMultClamp->getOutputSize();
+             else
+                 outputOffset = it->bufferSize();
+             outputOffset += it->bufferSize(),
+             it->forward(static_cast<const void *>(buffer + inputOffset),
+                         static_cast<void *>(buffer + outputOffset));
+             inputOffset = outputOffset;
+             first = false;
         }
 #ifdef NNUE_TRACE
         std::cout << "output: "
-                  << reinterpret_cast<int32_t *>(buffer + lastOffset)[0] /
+                  << reinterpret_cast<int32_t *>(buffer + outputOffset)[0] /
                          FV_SCALE
                   << std::endl;
 #endif
-        return reinterpret_cast<int32_t *>(buffer + lastOffset)[0] /
+        return reinterpret_cast<int32_t *>(buffer + outputOffset)[0] /
                FV_SCALE;
     }
 

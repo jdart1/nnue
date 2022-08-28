@@ -63,11 +63,8 @@ public:
     virtual std::istream &read(std::istream &s) {
         // read hash
         (void)read_little_endian<uint32_t>(s);
-        std::cout << "----- feature transformer --- " << std::endl;
-        std::cout << "----- biases --- " << std::endl;
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
-            if (i<10) std::cout << static_cast<int>(_biases[i]) << ' ';
         }
         std::cout << std::endl;
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
