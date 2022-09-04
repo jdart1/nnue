@@ -569,27 +569,27 @@ static int test_clamp() {
     return errs;
 }
 
+template<size_t size>
 static int test_scale_and_clamp() {
     int errs = 0;
-    constexpr unsigned SIZE = 32;
     constexpr int CLAMP_MAX = 127;
     constexpr int SCALE = 6;
     using InputType = int32_t;
     using OutputType = uint8_t;
-    using ScaleAndClamper = nnue::ScaleAndClamp<InputType, OutputType, SIZE>;
+    using ScaleAndClamper = nnue::ScaleAndClamp<InputType, OutputType, size>;
 
-    alignas(nnue::DEFAULT_ALIGN) InputType input[SIZE];
-    alignas(nnue::DEFAULT_ALIGN) OutputType output[SIZE],output2[SIZE];
+    alignas(nnue::DEFAULT_ALIGN) InputType input[size];
+    alignas(nnue::DEFAULT_ALIGN) OutputType output[size],output2[size];
 
     ScaleAndClamper c(SCALE,CLAMP_MAX);
 
-    for (unsigned i = 0; i < SIZE; i++) {
+    for (unsigned i = 0; i < size; i++) {
         input[i] = -9000 + 900*std::min<unsigned>(i,10) + i;
         output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i] >> SCALE,0,CLAMP_MAX));
     }
-    std::memset(output2,'\0',SIZE*sizeof(OutputType));
+    std::memset(output2,'\0',size*sizeof(OutputType));
     c.doForward(input,output2);
-    for (unsigned i = 0; i < SIZE; i++) {
+    for (unsigned i = 0; i < size; i++) {
         errs += output2[i] != output[i];
     }
     if (errs) std::cerr << errs << " error(s) in scale and clamp function" << std::endl;
@@ -606,7 +606,8 @@ int main(int argc, char **argv) {
     errs += test_halfkp();
     errs += test_incremental();
     errs += test_clamp();
-    errs += test_scale_and_clamp();
+    errs += test_scale_and_clamp<16>();
+    errs += test_scale_and_clamp<32>();
     std::cerr << errs << " errors" << std::endl;
 
     std::string fname;

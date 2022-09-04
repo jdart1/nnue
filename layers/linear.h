@@ -25,7 +25,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
                                   OutputType *output) const noexcept {
         dotProduct(input, output);
 #ifdef NNUE_TRACE
-        std::cout << "----" << std::endl;
+        std::cout << "---- linear ----" << std::endl;
         for (unsigned i = 0; i < outputSize; ++i) {
             std::cout << int(output[i]) << ' ';
         }

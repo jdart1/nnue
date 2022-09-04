@@ -1,24 +1,22 @@
 #
 # Copyright 2020-2022 by Jon Dart. All Rights Reserved.
 #
-NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic -fsanitize=address -fsanitize=bounds-strict
+NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic
 
-#ARCH_FLAGS = -mavx2 -mbmi2 -msse4.1 -msse4.2 -DSIMD -DAVX2 -DSSSE3
-ARCH_FLAGS = -msse4.1 -msse4.2 -DSIMD -DSSSE3 -DSSE2
+ARCH_FLAGS = -mavx2 -mbmi2 -DSIMD -DAVX2 -DSSE2
 
 #OPT = -O3
 OPT = -g
 
 NN_LIBS := -lstdc++ -lc -lm
 
-CFLAGS := $(CFLAGS) $(NNUE_FLAGS) $(ARCH_FLAGS) $(OPT)
+CFLAGS := $(NNUE_FLAGS) $(ARCH_FLAGS) $(OPT)
 
-CPP = g++
+CPP ?= g++
 
 LD = $(CPP)
 
-#LDFLAGS = -fuse-ld=gold
-LDFLAGS =  -fsanitize=address -fsanitize=bounds-strict
+LDFLAGS = -fuse-ld=gold
 
 BUILD = build
 EXPORT = build
@@ -40,22 +38,22 @@ clean: dirs
 	cd $(EXPORT) && rm -f nnue_test
 
 $(BUILD)/%.o: %.cpp
-	$(CPP) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: layers/%.cpp
-	$(CPP) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: test/%.cpp
-	$(CPP) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: interface/%.cpp
-	$(CPP) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
 
 #$(BUILD)/%.s: test/%.cpp
-#	$(CPP) $(CXXFLAGS) $(OPT) $(CFLAGS) -S -fverbose-asm -o $@ $<
+#	$(CPP) $(OPT) $(CFLAGS) -S -fverbose-asm -o $@ $<
 
 #$(BUILD)/%.s: interface/%.cpp
-#	$(CPP) $(CXXFLAGS) $(OPT) $(CFLAGS) -S -fverbose-asm -o $@ $<
+#	$(CPP) $(OPT) $(CFLAGS) -S -fverbose-asm -o $@ $<
 
 $(EXPORT)/nnue_test: dirs $(NNUE_OBJS)
 	$(LD) $(OPT) $(LDFLAGS) $(NNUE_OBJS) $(DEBUG) -o $(BUILD)/nnue_test $(NN_LIBS)

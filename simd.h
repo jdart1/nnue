@@ -385,37 +385,46 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
     __m256i *outp = reinterpret_cast<__m256i *>(out);
     assert(sizeof(InType)==4);
     assert(sizeof(OutType)==1);
-    const __m256i control = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
-    const __m256i zero = _mm256_setzero_si256();
-    for (size_t i = 0; i < chunks<OutType,256>(size); ++i) {
-        // load 2x256 bit registers of shifted input data (32 bit input, 16 bit output)
-        __m256i r1  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
-        __m256i r2  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
-        // clamp and store into one 256-bit output chunk
-        outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero), control);
+    if constexpr (size*8 >= 256) {
+        assert(size*8 % 256 == 0);
+        const __m256i control = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
+        const __m256i zero = _mm256_setzero_si256();
+        for (size_t i = 0; i < chunks<OutType,256>(size); ++i) {
+            // load 2x256 bit registers of shifted input data (32 bit input, 16 bit output)
+            const __m256i r1  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
+            const __m256i r2  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
+            // clamp and store into one 256-bit output chunk
+            outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero), control);
+        }
+        return;
     }
-#elif defined(SSE2) || defined(SSSE3)
-    const vec_t *inp = reinterpret_cast<const vec_t *>(in);
-    vec_t *outp = reinterpret_cast<vec_t *>(out);
-    assert(sizeof(InType)==4);
-    assert(sizeof(OutType)==1);
+    else
+#if defined(SSE2) || defined(SSSE3)
+    {
+        const __m128i *inp = reinterpret_cast<const __m128i *>(in);
+        __m128i *outp = reinterpret_cast<__m128i *>(out);
+        assert(sizeof(InType)==4);
+        assert(sizeof(OutType)==1);
 #ifdef SSE41
-    const vec_t zero = _mm_setzero_si128();
+        const __m128i zero = _mm_setzero_si128();
 #else
-    const vec_t k0x80s = _mm_set1_epi8(-128);
+        const __m128i k0x80s = _mm_set1_epi8(-128);
 #endif
-    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
-        // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and clamp
-        vec_t r1  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
-        vec_t r2  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
-        // pack into 8-bit output and clamp
-        outp[i] =
+        assert(size*8 % 128 == 0);
+        for (size_t i = 0; i < chunks<OutType,128>(size); ++i) {
+            // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and clamp
+            __m128i r1  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
+            __m128i r2  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
+            // pack into 8-bit output and clamp
+            outp[i] =
 #ifdef SSE41
-            _mm_max_epi8(_mm_packs_epi16(r1, r2), zero);
+                _mm_max_epi8(_mm_packs_epi16(r1, r2), zero);
 #else
             _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(r1, r2), k0x80s), k0x80s);
 #endif
+        }
     }
+#endif
 #endif
 }
 
