@@ -1,4 +1,4 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_NETWORK_H
 #define _NNUE_NETWORK_H
 
@@ -38,9 +38,9 @@ class Network {
         layers.push_back(new Layer1());
         layers.push_back(new Clamper(127));
         layers.push_back(new Layer2());
-        layers.push_back(new ScaleAndClamper(64, 127));
+        layers.push_back(new ScaleAndClamper(6, 127));
         layers.push_back(new Layer3());
-        layers.push_back(new ScaleAndClamper(64, 127));
+        layers.push_back(new ScaleAndClamper(6, 127));
         layers.push_back(new Layer4());
 #ifndef NDEBUG
         size_t bufferSize = 0;
