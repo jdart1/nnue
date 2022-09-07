@@ -399,7 +399,8 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
         return;
     }
     else
-#if defined(SSE2) || defined(SSSE3)
+#endif
+#if defined(AVX2) || defined(SSE2) || defined(SSSE3)
     {
         const __m128i *inp = reinterpret_cast<const __m128i *>(in);
         __m128i *outp = reinterpret_cast<__m128i *>(out);
@@ -425,9 +426,8 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
         }
     }
 #endif
-#endif
 }
-
+    
 // implements the 2nd layer of the SFv4 net, transforming the output of one half of the accumulator
 // into a uint8_t vector
 template <typename InType, typename OutType, size_t size>
