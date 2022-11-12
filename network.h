@@ -15,12 +15,11 @@ class Network {
 
     template <typename ChessInterface> friend class Evaluator;
 
-  public:
+public:
     static constexpr size_t Layer1OutputSize = 1024;
 
     static constexpr size_t Layer1Rows = 22 * Layer1OutputSize;
 
-    using IndexArray = std::array<int, MAX_INDICES>;
     using OutputType = int32_t;
     using Layer1 = HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, Layer1Rows,
                               Layer1OutputSize>;
@@ -90,35 +89,48 @@ class Network {
         // evaluate the remaining layers, in the correct bucket
         bool first = true;
         for (const auto &it : layers[bucket]) {
-             if (first)
-                 outputOffset += halfKaMultClamp->getOutputSize();
-             else
-                 outputOffset = it->bufferSize();
-             outputOffset += it->bufferSize(),
-             it->forward(static_cast<const void *>(buffer + inputOffset),
-                         static_cast<void *>(buffer + outputOffset));
-             inputOffset = outputOffset;
-             first = false;
+            if (first)
+                outputOffset += halfKaMultClamp->getOutputSize();
+            else
+                outputOffset = it->bufferSize();
+            outputOffset += it->bufferSize(),
+                it->forward(static_cast<const void *>(buffer + inputOffset),
+                            static_cast<void *>(buffer + outputOffset));
+            inputOffset = outputOffset;
+            first = false;
         }
 #ifdef NNUE_TRACE
         std::cout << "output: "
                   << reinterpret_cast<int32_t *>(buffer + outputOffset)[0] /
-                         FV_SCALE
+            FV_SCALE
                   << std::endl;
 #endif
         return reinterpret_cast<int32_t *>(buffer + outputOffset)[0] /
-               FV_SCALE;
+            FV_SCALE;
     }
 
     friend std::istream &operator>>(std::istream &i, Network &);
 
-  protected:
+    // Perform an incremental update
+    void updateAccum(const IndexArray &added, const IndexArray &removed,
+                     size_t added_count, size_t removed_count,
+                     AccumulatorHalf half, AccumulatorType &output) const noexcept {
+        transformer->updateAccum(added, removed, added_count, removed_count, half, output);
+    }
+
+    // Propagate data through the layer, updating the specified half of the
+    // accumulator (side to move goes in lower half).
+    void updateAccum(const IndexArray &indices, AccumulatorHalf half, AccumulatorType &output) const noexcept {
+        transformer->updateAccum(indices, half, output);
+    }
+
+protected:
     Layer1 *transformer;
     HalfKaMultClamp *halfKaMultClamp;
     std::vector<BaseLayer *> layers[PSQBuckets];
 };
 
-inline std::istream &operator>>(std::istream &s, nnue::Network &network) {
+inline std::istream &operator>>(std::istream &s, Network &network) {
     std::uint32_t version, size;
     version = read_little_endian<uint32_t>(s);
     // TBD: validate hash

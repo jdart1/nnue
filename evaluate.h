@@ -3,15 +3,15 @@
 #define _NNUE_EVALUATE_H
 
 template <typename ChessInterface> class Evaluator {
-  public:
+public:
     template <Color kside>
     static size_t getIndices(const ChessInterface &intf, IndexArray &out) {
         IndexArray::iterator it = out.begin();
         for (const auto &pair : intf) {
             const Square &sq = pair.first;
             const Piece &piece = pair.second;
-            *it++ = nnue::Network::getIndex<kside>(intf.kingSquare(kside),
-                                                   piece, sq);
+            *it++ = Network::getIndex<kside>(intf.kingSquare(kside),
+                                             piece, sq);
         }
         *it = LAST_INDEX;
         return it - out.begin();
@@ -67,24 +67,16 @@ template <typename ChessInterface> class Evaluator {
         size_t added_count, removed_count;
         getIndexDiffs(ciSource, ciTarget, c, added, removed, added_count,
                       removed_count);
-        /**
-        std::cout << "incr " << (c == nnue::White ? "White" : "Black") << ":";
-        std::cout << " removed ";
-        for (unsigned i = 0; i < removed_count; i++) std::cout << int(removed[i]) << ' ';
-        std::cout << " added ";
-        for (unsigned i = 0; i < added_count; i++) std::cout << int(added[i]) << ' ';
-        std::cout << std::endl;
-        **/
         // copy from source to target
         AccumulatorHalf sourceHalf =
             Network::AccumulatorType::getHalf(c, ciSource.sideToMove());
         AccumulatorHalf targetHalf =
             Network::AccumulatorType::getHalf(c, ciTarget.sideToMove());
         ciTarget.getAccumulator().copy_half(
-            targetHalf, ciSource.getAccumulator(), sourceHalf);
+                                            targetHalf, ciSource.getAccumulator(), sourceHalf);
         // update based on diffs
-        network.transformer->updateAccum(added, removed, added_count, removed_count,
-                                    targetHalf, ciTarget.getAccumulator());
+        network.updateAccum(added, removed, added_count, removed_count,
+                                     targetHalf, ciTarget.getAccumulator());
         ciTarget.getAccumulator().setState(targetHalf,
                                            AccumulatorState::Computed);
     }
@@ -98,7 +90,7 @@ template <typename ChessInterface> class Evaluator {
             if (idx == nnue::LAST_INDEX)
                 break;
         }
-        network.transformer->updateAccum(indices, targetHalf, accum);
+        network.updateAccum(indices, targetHalf, accum);
         accum.setState(targetHalf,AccumulatorState::Computed);
     }
 
@@ -107,7 +99,7 @@ template <typename ChessInterface> class Evaluator {
                             const Color c) {
         // see if incremental update is possible
         Network::AccumulatorType &accum = intf.getAccumulator();
-        int gain = intf.pieceCount() - 2; // pieces minus Kings
+        int gain = intf.pieceCount();
         AccumulatorHalf half;
         AccumulatorHalf targetHalf = half =
             Network::AccumulatorType::getHalf(intf.sideToMove(), c);
@@ -143,7 +135,7 @@ template <typename ChessInterface> class Evaluator {
                 getIndices<White>(intf, indices);
             else
                 getIndices<Black>(intf, indices);
-            network.transformer->updateAccum(indices, targetHalf, accum);
+            network.updateAccum(indices, targetHalf, accum);
         }
         accum.setState(targetHalf,AccumulatorState::Computed);
     }
@@ -158,7 +150,7 @@ template <typename ChessInterface> class Evaluator {
 #ifdef NNUE_TRACE
         std::cout << "full evaluate" << std::endl;
         std::cout << "bucket=" << getBucket(intf) << std::endl;
-        std::cout << accum << std::endl;;
+        std::cout << accum << std::endl;
 #endif        
         return network.evaluate(accum, getBucket(intf));
     }
@@ -179,8 +171,8 @@ private:
             else
                 getIndices<Black>(intf, indices);
             AccumulatorHalf targetHalf =
-              Network::AccumulatorType::getHalf(intf.sideToMove(), color);
-            network.transformer->updateAccum(indices, targetHalf, accum);
+                Network::AccumulatorType::getHalf(intf.sideToMove(), color);
+            network.updateAccum(indices, targetHalf, accum);
             accum.setState(targetHalf,AccumulatorState::Computed);
         }
     }

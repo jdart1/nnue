@@ -143,10 +143,6 @@ inline void dotProductnxn(const uint8_t *input,
                 m512_add_dpbusd_epi32(prod, inp[0], w[j / 64]);
             }
 	    output[i] += _mm512_reduce_add_epi32(prod);
-	    /*
-	    __m256i sum = _mm256_add_epi32(_mm512_castsi512_si256(prod),_mm512_extracti32x8_epi32(prod, 1));
-	   output[i] += m256_hadd_8x32(sum);
-	    */
         }
         return;
     }
@@ -425,9 +421,11 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
 #endif
         }
     }
+#else
+#error at least one of: AVX2, SSE2, SSSE3 must be defined
 #endif
 }
-    
+
 // implements the 2nd layer of the SFv4 net, transforming the output of one half of the accumulator
 // into a uint8_t vector
 template <typename InType, typename OutType, size_t size>
@@ -475,3 +473,4 @@ static inline void multAndSum(const InType *input, OutType *output, unsigned cla
 } // namespace simd
 
 #endif
+

@@ -1,16 +1,13 @@
 #
 # Copyright 2020-2022 by Jon Dart. All Rights Reserved.
 #
-NNUE_FLAGS = -I. -g -std=c++17 -Wall -Wextra -Wpedantic
+ARCH_FLAGS := -DSIMD -DSSE2 -DAVX2 -DUSE_POPCNT -DSSSE3 -DSSE41 -mavx2 -mbmi2 -msse4.1 -msse4.2 -mpopcnt
 
-ARCH_FLAGS = -mavx2 -mbmi2 -DSIMD -DAVX2 -DSSE2
-
-#OPT = -O3
-OPT = -g
+OPT := -O3
 
 NN_LIBS := -lstdc++ -lc -lm
 
-CFLAGS := $(NNUE_FLAGS) $(ARCH_FLAGS) $(OPT)
+CFLAGS := $(NNUE_FLAGS) $(ARCH_FLAGS) $(OPT) -std=c++17 -I.
 
 CPP ?= g++
 
@@ -38,10 +35,10 @@ clean: dirs
 	cd $(EXPORT) && rm -f nnue_test
 
 $(BUILD)/%.o: %.cpp
-	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CPP) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: layers/%.cpp
-	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CPP) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: test/%.cpp
 	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
