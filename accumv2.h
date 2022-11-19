@@ -125,7 +125,7 @@ class AccumulatorV2 {
     }
 
     const PSQType getPSQValue() const noexcept {
-        return _psq_accum[halfToIndex(AccumulatorHalf::Lower)] - _psq_accum[halfToIndex(AccumulatorHalf::Upper)];
+        return (_psq_accum[halfToIndex(AccumulatorHalf::Lower)] - _psq_accum[halfToIndex(AccumulatorHalf::Upper)])/2;
     }
 
     AccumulatorState getState(AccumulatorHalf half) const noexcept {

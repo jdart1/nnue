@@ -27,9 +27,9 @@ public:
     using AccumulatorOutputType = int16_t;
     using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, Layer1OutputSize>;
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, Layer1OutputSize, 16>;
-    using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 16, 32>;
+    using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 15, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
-    using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 16>;
+    using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 15>;
     using ScaleAndClamper2 = ScaleAndClamp<int32_t, uint8_t, 32>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
@@ -87,26 +87,32 @@ public:
         halfKaMultClamp->postProcessAccum(accum,
                                           reinterpret_cast<uint8_t*>(buffer));
         // evaluate the remaining layers, in the correct bucket
-        bool first = true;
+        int layer = 0;
+        int fwdOut;
         for (const auto &it : layers[bucket]) {
-            if (first)
+            if (layer == 0)
                 outputOffset += halfKaMultClamp->getOutputSize();
             else
                 outputOffset = it->bufferSize();
             outputOffset += it->bufferSize(),
                 it->forward(static_cast<const void *>(buffer + inputOffset),
                             static_cast<void *>(buffer + outputOffset));
+            if (layer == 0) {
+                // the last column of this layer's output is "fed foward"
+                fwdOut = reinterpret_cast<int32_t *>(buffer + outputOffset + 15)[0];
+            }
             inputOffset = outputOffset;
-            first = false;
+            ++layer;
         }
+        int nnOut = reinterpret_cast<int32_t *>(buffer + outputOffset)[0];
+        int fwdOutScaled = int(fwdOut * (600 * FV_SCALE) / (127 * (1 << WEIGHT_SCALE_BITS)));
+        int psqVal = accum.getPSQValue();
 #ifdef NNUE_TRACE
-        std::cout << "output: "
-                  << reinterpret_cast<int32_t *>(buffer + outputOffset)[0] /
-            FV_SCALE
-                  << std::endl;
+        std::cout << "NN output: " << nnOut << " fwdOut (pre-scaling) = " << fwdOut << 
+            " fwdOut (scaled): " << fwdOutScaled << " psq = " << psqVal << " total:" <<
+            (nnOut + fwdOutScaled + psqVal) / FV_SCALE << std::endl;
 #endif
-        return reinterpret_cast<int32_t *>(buffer + outputOffset)[0] /
-            FV_SCALE;
+       return (nnOut + fwdOutScaled + psqVal) / FV_SCALE;
     }
 
     friend std::istream &operator>>(std::istream &i, Network &);
