@@ -29,7 +29,7 @@ public:
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, Layer1OutputSize, 16>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 15, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
-    using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 15>;
+    using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 16>;
     using ScaleAndClamper2 = ScaleAndClamp<int32_t, uint8_t, 32>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
@@ -77,7 +77,7 @@ public:
     int32_t evaluate(const AccumulatorType &accum, unsigned bucket) const {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
         // propagate data through the remaining layers
-        size_t inputOffset = 0, outputOffset = 0;
+        size_t inputOffset, outputOffset;
 #ifdef NNUE_TRACE
         std::cout << "bucket=" << bucket << std::endl;
         std::cout << "accumulator:" << std::endl;
@@ -86,27 +86,27 @@ public:
         // post-process accumulator
         halfKaMultClamp->postProcessAccum(accum,
                                           reinterpret_cast<uint8_t*>(buffer));
+        outputOffset = halfKaMultClamp->getOutputSize();
+        inputOffset = 0;
         // evaluate the remaining layers, in the correct bucket
         int layer = 0;
         int fwdOut;
         for (const auto &it : layers[bucket]) {
-            if (layer == 0)
-                outputOffset += halfKaMultClamp->getOutputSize();
-            else
-                outputOffset = it->bufferSize();
-            outputOffset += it->bufferSize(),
-                it->forward(static_cast<const void *>(buffer + inputOffset),
-                            static_cast<void *>(buffer + outputOffset));
+            if (layer > 0) {
+                outputOffset += it->bufferSize();
+            }
+            it->forward(static_cast<const void *>(buffer + inputOffset),
+                        static_cast<void *>(buffer + outputOffset));
             if (layer == 0) {
                 // the last column of this layer's output is "fed foward"
-                fwdOut = reinterpret_cast<int32_t *>(buffer + outputOffset + 15)[0];
+                fwdOut = reinterpret_cast<int32_t *>(buffer + outputOffset)[15];
             }
             inputOffset = outputOffset;
             ++layer;
         }
         int nnOut = reinterpret_cast<int32_t *>(buffer + outputOffset)[0];
         int fwdOutScaled = int(fwdOut * (600 * FV_SCALE) / (127 * (1 << WEIGHT_SCALE_BITS)));
-        int psqVal = accum.getPSQValue();
+        int psqVal = accum.getPSQValue(bucket);
 #ifdef NNUE_TRACE
         std::cout << "NN output: " << nnOut << " fwdOut (pre-scaling) = " << fwdOut << 
             " fwdOut (scaled): " << fwdOutScaled << " psq = " << psqVal << " total:" <<

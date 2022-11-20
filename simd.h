@@ -377,6 +377,7 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
 template <size_t size, typename InType, typename OutType>
 inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[maybe_unused]] InType clampMax) {
 #ifdef AVX2
+    assert(size*sizeof(InType) >= 64 && size*sizeof(InType) % 64 == 0);
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
     __m256i *outp = reinterpret_cast<__m256i *>(out);
     assert(sizeof(InType)==4);
