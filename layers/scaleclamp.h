@@ -26,7 +26,7 @@ class ScaleAndClamp
         }
 #endif
 #ifdef NNUE_TRACE
-        std::cout << "----" << std::endl;
+        std::cout << "---- scale/clamp ----" << std::endl;
         for (size_t i = 0; i < size; ++i) {
             std::cout << int(output[i]) << ' ';
         }
