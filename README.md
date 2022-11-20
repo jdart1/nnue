@@ -1,6 +1,6 @@
 # nnue
 
-This code provides an implementation of a [Efficiently Updatable Neural Network (NNUE)](https://www.chessprogramming.org/NNUE) for chess, compatible with the original implementation in [Stockfish](https://github.com/official-stockfish/Stockfish), which was based on contributions from Hisayori Noda aka Nodchip..
+This code provides an implementation of a [Efficiently Updatable Neural Network (NNUE)](https://www.chessprogramming.org/NNUE) for chess, compatible with the "[version 4](https://github.com/official-stockfish/Stockfish/commit/cb9c2594fcedc881ae8f8bfbfdf130cf89840e4c)" implementation in [Stockfish](https://github.com/official-stockfish/Stockfish). The original Stockfish NNUE was based on contributions from Hisayori Noda aka Nodchip. Later versions have been implemented primarily by Tomasz Sobczyk.
 
 ## Copyright, license
 
@@ -13,7 +13,7 @@ MIT Licensed.
 - can read Stockfish network files using insertion operator on the Network class
 - templated to support different network sizes, weight types, etc.
 - full and incremental update supported
-- SIMD support for amd64 processors
+- SIMD support for x64 processors
 - unit test code
 
 ## Missing Features
@@ -21,10 +21,11 @@ MIT Licensed.
 - no SIMD for non-Intel such as M1
 - read only, no support for writing network files
 - does not validate hash codes from existing network files
+- lacking certain optimizations that are in Stockfish
 
 ## Compilation
 
-Requires C++-17. The Makefile (Gnu Make) builds a test executable. -DSIMD must be specificed to select SIMD optimizations. If SIMD is set then tthe following flags can be set to select the desired instruction set(s). They can be combined and are utilized in the following order of precedence.
+Requires C++-17. The Makefile (Gnu Make) builds a test executable. -DSIMD must be specificed to select SIMD optimizations. If SIMD is set then the following flags can be set to select the desired instruction set(s). They can be combined and are utilized in the following order of precedence.
 
 1. AVX512
 2. VNNI (in addition to AVX2)
