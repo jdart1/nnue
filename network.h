@@ -29,17 +29,17 @@ public:
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, Layer1OutputSize, 16>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 15, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
-    using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 16>;
-    using ScaleAndClamper2 = ScaleAndClamp<int32_t, uint8_t, 32>;
+    using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 16, 6>;
+    using ScaleAndClamper2 = ScaleAndClamp<int32_t, uint8_t, 32, 6>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
     Network() :  transformer(new Layer1()), halfKaMultClamp(new HalfKaMultClamp(7, 127)) {
         for (unsigned i = 0; i < PSQBuckets; ++i) {
             layers[i].push_back(new Layer2());
-            layers[i].push_back(new ScaleAndClamper1(6, 127));
+            layers[i].push_back(new ScaleAndClamper1(127));
             layers[i].push_back(new Layer3());
-            layers[i].push_back(new ScaleAndClamper2(6, 127));
+            layers[i].push_back(new ScaleAndClamper2(127));
             layers[i].push_back(new Layer4());
         }
 #ifndef NDEBUG

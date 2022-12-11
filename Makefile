@@ -4,16 +4,21 @@
 ARCH_FLAGS := -DSIMD -DSSE2 -DAVX2 -DUSE_POPCNT -DSSSE3 -DSSE41 -mavx2 -mbmi2 -msse4.1 -msse4.2 -mpopcnt
 
 OPT := -O3
+NNUE_FLAGS = -I. -std=c++17 -Wall -Wextra -Wpedantic
+
+ARCH_FLAGS = -mavx2 -mbmi2 -msse2 -DSIMD -DAVX2
+#ARCH_FLAGS = -DSIMD -DNEON -mcpu=apple-m1
 
 NN_LIBS := -lstdc++ -lc -lm
 
 CFLAGS := $(NNUE_FLAGS) $(ARCH_FLAGS) $(OPT) -std=c++17 -I.
 
-CPP ?= g++
+CXX ?= g++
 
-LD = $(CPP)
+LD = $(CXX)
 
-LDFLAGS = -fuse-ld=gold
+#LDFLAGS = -fuse-ld=gold
+#LDFLAGS =  -fsanitize=address -fsanitize=bounds-strict
 
 BUILD = build
 EXPORT = build
@@ -35,22 +40,16 @@ clean: dirs
 	cd $(EXPORT) && rm -f nnue_test
 
 $(BUILD)/%.o: %.cpp
-	$(CPP) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: layers/%.cpp
-	$(CPP) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: test/%.cpp
-	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: interface/%.cpp
-	$(CPP) $(OPT) $(CFLAGS) -c -o $@ $<
-
-#$(BUILD)/%.s: test/%.cpp
-#	$(CPP) $(OPT) $(CFLAGS) -S -fverbose-asm -o $@ $<
-
-#$(BUILD)/%.s: interface/%.cpp
-#	$(CPP) $(OPT) $(CFLAGS) -S -fverbose-asm -o $@ $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
 
 $(EXPORT)/nnue_test: dirs $(NNUE_OBJS)
 	$(LD) $(OPT) $(LDFLAGS) $(NNUE_OBJS) $(DEBUG) -o $(BUILD)/nnue_test $(NN_LIBS)
