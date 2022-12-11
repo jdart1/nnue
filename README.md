@@ -13,18 +13,22 @@ MIT Licensed.
 - can read Stockfish network files using insertion operator on the Network class
 - templated to support different network sizes, weight types, etc.
 - full and incremental update supported
-- SIMD support for amd64 processors
+- SIMD support for x86_64 and ARM NEON architectures
 - unit test code
 
 ## Missing Features
 
-- no SIMD for non-Intel such as M1
 - read only, no support for writing network files
 - does not validate hash codes from existing network files
 
 ## Compilation
 
-Requires C++-17. The Makefile (Gnu Make) builds a test executable. -DSIMD must be specificed to select SIMD optimizations. If SIMD is set then tthe following flags can be set to select the desired instruction set(s). They can be combined and are utilized in the following order of precedence.
+Requires C++-17. The Makefile (Gnu Make) builds a test executable. -DSIMD must be specificed to select SIMD optimizations. If SIMD is set then
+also one or more flags must be set to select the desired instruction set(s).
+
+Add -DNEON to use the ARMv8 NEON instruction set.
+
+For x86_64 processors, the following flags can be set. They can be combined and are utilized in the following order of precedence.
 
 1. AVX512_VNNI (in addition to AVX512)
 2. AVX512

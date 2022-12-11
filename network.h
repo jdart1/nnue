@@ -29,7 +29,7 @@ class Network {
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 512, 32>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
-    using ScaleAndClamper = ScaleAndClamp<int32_t, uint8_t, 32>;
+    using ScaleAndClamper = ScaleAndClamp<int32_t, uint8_t, 32, 6>;
     using Clamper = Clamp<int16_t, uint8_t, 512>;
 
     static constexpr size_t BUFFER_SIZE = 2048;
@@ -38,9 +38,9 @@ class Network {
         layers.push_back(new Layer1());
         layers.push_back(new Clamper(127));
         layers.push_back(new Layer2());
-        layers.push_back(new ScaleAndClamper(6, 127));
+        layers.push_back(new ScaleAndClamper(127));
         layers.push_back(new Layer3());
-        layers.push_back(new ScaleAndClamper(6, 127));
+        layers.push_back(new ScaleAndClamper(127));
         layers.push_back(new Layer4());
 #ifndef NDEBUG
         size_t bufferSize = 0;

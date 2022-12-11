@@ -3,7 +3,11 @@
 #define NNUE_SIMD_H
 
 extern "C" {
+#if defined(NEON)
+#include <arm_neon.h>
+#else
 #include <immintrin.h>
+#endif
 }
 
 namespace simd {
@@ -21,8 +25,13 @@ namespace simd {
     using vec_t = __m128i;
     static const vec_t ones128 = _mm_set1_epi16(1);
     static constexpr size_t simdWidth = 128;
+#elif defined(NEON)
+    using vec_t = int16x8_t;
+    static const vec_t ones128 = vdupq_n_s16(1);
+    static const vec_t zeros128 = vdupq_n_s16(0);
+    static constexpr size_t simdWidth = 128;
 #else
-#error must set at least one of: AVX2, SSSE3 or SSE2
+#error must set at least one of: AVX512, AVX2, SSSE3, SSE2 or NEON
 #endif
 
 template <typename T,unsigned simdWidth>
@@ -110,6 +119,20 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     __m128i sum_second_32 = _mm_shufflelo_epi16(sum, _MM_SHUFFLE(1, 0, 3, 2));
     sum = _mm_add_epi32(sum, sum_second_32);
     output[0] = _mm_cvtsi128_si32(sum) + biases[0];
+#elif defined(NEON)
+    const int8x8_t *inp = reinterpret_cast<const int8x8_t *>(input);
+    const int8x8_t *row = reinterpret_cast<const int8x8_t *>(weights);
+    constexpr unsigned inputSize = 32;
+    int32x4_t accum =  vmovq_n_s32(0);
+    for (unsigned i = 0; i < chunks<uint8_t,simdWidth/2>(inputSize); i+=2) {
+        // parallel multiply 64-bit chunks into product register
+        vec_t prod = vmull_s8(inp[i], row[i]);
+        // multiply and add next 64 bits
+        prod = vmlal_s8(prod, inp[i+1], row[i+1]);
+        // sum the products
+        accum = vpadalq_s16(accum, prod);
+    }
+    output[0] = vaddvq_s32(accum) + biases[0];
 #endif
 }
 
@@ -194,6 +217,21 @@ inline void dotProductnx32(const uint8_t *input,
         sum = _mm_add_epi32(sum, sum_second_32);
         output[i] = _mm_cvtsi128_si32(sum);
     }
+#elif defined(NEON)
+    const int8x8_t *inp = reinterpret_cast<const int8x8_t *>(input);
+    for (unsigned i = 0; i < outputSize; ++i) {
+        const int8x8_t *row = reinterpret_cast<const int8x8_t *>(weights + i);
+        int32x4_t accum = vld1q_s32(biases + 4*i);
+        for (unsigned j = 0; j < chunks<uint8_t,simdWidth/2>(inputSize); j+=2) {
+            // parallel multiply 64-bit chunks into product register
+            vec_t prod = vmull_s8(inp[j], row[j]);
+            // multiply and add next 64 bits
+            prod = vmlal_s8(prod, inp[j+1], row[j+1]);
+            // sum the products
+            accum = vpadalq_s16(accum, prod);
+        }
+        output[i] = vaddvq_s32(accum);
+    }
 #endif
 }
 
@@ -210,12 +248,21 @@ inline void vec_copy(const DataType *in,DataType *out) {
         outp[i] = _mm256_load_si256(inp+i);
 #elif defined(SSE2) || defined(SSSE3)
         outp[i] = _mm_load_si128(inp+i);
+#elif defined(NEON)
+        outp[i] = vld1q_s64(reinterpret_cast<const long long*>(inp + i));
 #endif
     }
 }
 
 template <size_t size, typename InType, typename OutType>
 inline void vec_add(const InType *in, OutType *out) {
+#ifdef NEON
+    const int16x8_t *inp = reinterpret_cast<const int16x8_t *>(in);
+    int16x8_t *outp = reinterpret_cast<int16x8_t *>(out);
+    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
+        outp[i] = vaddq_s16(outp[i], inp[i]);
+    }
+#else
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
     for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
@@ -227,10 +274,18 @@ inline void vec_add(const InType *in, OutType *out) {
         outp[i] = _mm_add_epi16(outp[i], inp[i]);
 #endif
     }
+#endif
 }
 
 template <size_t size, typename InType, typename OutType>
 inline void vec_sub(const InType *in, OutType *out) {
+#ifdef NEON
+    const int16x8_t *inp = reinterpret_cast<const int16x8_t *>(in);
+    int16x8_t *outp = reinterpret_cast<int16x8_t *>(out);
+    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
+        outp[i] = vsubq_s16(outp[i], inp[i]);
+    }
+#else
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
     for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
@@ -242,6 +297,7 @@ inline void vec_sub(const InType *in, OutType *out) {
         outp[i] = _mm_sub_epi16(outp[i], inp[i]);
 #endif
     }
+#endif
 }
 
 template <size_t size, typename InType, typename OutType>
@@ -281,18 +337,49 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
         out1 = _mm_min_epi16(_mm_max_epi16(words1, packedZeros), packedMax);
         outp[i] = _mm_packs_epi16(out0,out1);
     }
+#elif defined(NEON)
+    vec_t *outp = reinterpret_cast<vec_t *>(out);
+    const int8x16_t packedZeros = vdupq_n_s8(0);
+    const int8x16_t packedMax = vdupq_n_s16(clampMax);
+    size_t j = 0;
+    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i, j += 2) {
+        vec_t words0 = vld1q_s16(in + 8 * (j + 0));
+        vec_t words1 = vld1q_s16(in + 8 * (j + 1));
+	vec_t out0 = vminq_s16(vmaxq_s16(words0, packedZeros), packedMax);
+	vec_t out1 = vminq_s16(vmaxq_s16(words1, packedZeros), packedMax);
+        outp[i] = vcombine_s8(vmovn_s16(out0), vmovn_s16(out1));
+    }
 #endif
 }
 
-template <size_t size, typename InType, typename OutType>
-inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[maybe_unused]] InType clampMax) {
-#ifdef AVX2
+template <typename InType, typename OutType, size_t size, unsigned rshift>
+inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampMax) {
+    static_assert(sizeof(InType)==4 && sizeof(OutType)==1,"conditions not met for scale_and_clamp SIMD implementation");
+#ifdef NEON
+    vec_t *outp = reinterpret_cast<vec_t *>(out);
+    const int8x16_t packedZeros = vdupq_n_s8(0);
+    const int8x16_t packedMax = vdupq_n_s16(clampMax);
+    size_t j = 0;
+    static_assert(size*8 >= simdWidth && size*8 % simdWidth == 0,"conditions not met for scale_and_clamp SIMD implementation");
+    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i, j += 4) {
+        int32x4_t r0 = vld1q_s32(in + 4 * (j + 0));
+        int32x4_t r1 = vld1q_s32(in + 4 * (j + 1));
+        int32x4_t r2 = vld1q_s32(in + 4 * (j + 2));
+        int32x4_t r3 = vld1q_s32(in + 4 * (j + 3));
+        // shift and narrow
+        int8x16_t words0 = vcombine_s16(vshrn_n_s32(r0,rshift),vshrn_n_s32(r1,rshift));
+        int8x16_t words1 = vcombine_s16(vshrn_n_s32(r2,rshift),vshrn_n_s32(r3,rshift));
+        // do min/max
+	vec_t out0 = vminq_s16(vmaxq_s16(words0, packedZeros), packedMax);
+	vec_t out1 = vminq_s16(vmaxq_s16(words1, packedZeros), packedMax);
+        // pack into output
+        outp[i] = vcombine_s8(vmovn_s16(out0), vmovn_s16(out1));
+    }
+#elif defined(AVX2)
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
     __m256i *outp = reinterpret_cast<__m256i *>(out);
-    assert(sizeof(InType)==4);
-    assert(sizeof(OutType)==1);
     if constexpr (size*8 >= 256) {
-        assert(size*8 % 256 == 0);
+        static_assert(size*8 % 256 == 0,"conditions not met for scale_and_clamp SIMD implementation");
         const __m256i control = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
         const __m256i zero = _mm256_setzero_si256();
         for (size_t i = 0; i < chunks<OutType,256>(size); ++i) {
@@ -310,14 +397,12 @@ inline void scale_and_clamp(const InType *in, OutType *out, unsigned rshift, [[m
     {
         const __m128i *inp = reinterpret_cast<const __m128i *>(in);
         __m128i *outp = reinterpret_cast<__m128i *>(out);
-        assert(sizeof(InType)==4);
-        assert(sizeof(OutType)==1);
 #ifdef SSE41
         const __m128i zero = _mm_setzero_si128();
 #else
         const __m128i k0x80s = _mm_set1_epi8(-128);
 #endif
-        assert(size*8 % 128 == 0);
+        static_assert(size*8 % 128 == 0,"conditions not met for scale_and_clamp SIMD implementation");
         for (size_t i = 0; i < chunks<OutType,128>(size); ++i) {
             // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and clamp
             __m128i r1  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);

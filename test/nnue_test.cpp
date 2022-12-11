@@ -47,8 +47,8 @@ static int test_linear() {
 
     nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS> layer;
 
-#if defined(__MINGW32__) || defined(__MINGW64__)
-    std::string tmp_name("XXX");
+#if defined(__MINGW32__) || defined(__MINGW64__) || (defined(__APPLE__) && defined(__MACH__))
+    std::string tmp_name("XXXXXX");
 #else
     std::string tmp_name(std::tmpnam(nullptr));
 #endif
@@ -481,7 +481,7 @@ static int test_clamp() {
     Clamper c(CLAMP_MAX);
 
     for (unsigned i = 0; i < SIZE; i++) {
-        input[i] = (i%20)-10 + (i%5)*30;
+        input[i] = (i%20)-10 + (i%6)*30;
         output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i],0,static_cast<InputType>(CLAMP_MAX)));
     }
     std::memset(output2,'\0',SIZE*sizeof(OutputType));
@@ -500,12 +500,12 @@ static int test_scale_and_clamp() {
     constexpr int RSHIFT = 6;
     using InputType = int32_t;
     using OutputType = uint8_t;
-    using ScaleAndClamper = nnue::ScaleAndClamp<InputType, OutputType, size>;
+    using ScaleAndClamper = nnue::ScaleAndClamp<InputType, OutputType, size, RSHIFT>;
 
     alignas(nnue::DEFAULT_ALIGN) InputType input[size];
     alignas(nnue::DEFAULT_ALIGN) OutputType output[size],output2[size];
 
-    ScaleAndClamper c(RSHIFT,CLAMP_MAX);
+    ScaleAndClamper c(CLAMP_MAX);
 
     for (unsigned i = 0; i < size; i++) {
         input[i] = -8000 + 900*std::min<unsigned>(i,10) + i*10;
