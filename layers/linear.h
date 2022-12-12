@@ -29,11 +29,9 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize,
         if constexpr (outputSize == 1) { // output layer
             simd::dotProduct32x1(input,_weights[0],_biases,output);
         }
-#if !defined(NEON)
         else if constexpr (outputSize == 32) {
             simd::dotProductnx32<inputSize,outputSize>(input,_weights,_biases,output);
         }
-#endif
         else
 #endif
         {
