@@ -123,7 +123,7 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     const int8x8_t *inp = reinterpret_cast<const int8x8_t *>(input);
     const int8x8_t *row = reinterpret_cast<const int8x8_t *>(weights);
     constexpr unsigned inputSize = 32;
-    int32x4_t accum =  vmovq_n_s32(0);
+    int32x4_t accum = vmovq_n_s32(0);
     for (unsigned i = 0; i < chunks<uint8_t,simdWidth/2>(inputSize); i+=2) {
         // parallel multiply 64-bit chunks into product register
         vec_t prod = vmull_s8(inp[i], row[i]);
@@ -220,8 +220,8 @@ inline void dotProductnx32(const uint8_t *input,
 #elif defined(NEON)
     const int8x8_t *inp = reinterpret_cast<const int8x8_t *>(input);
     for (unsigned i = 0; i < outputSize; ++i) {
-        const int8x8_t *row = reinterpret_cast<const int8x8_t *>(weights + i);
-        int32x4_t accum = vld1q_s32(biases + 4*i);
+        const int8x8_t *row = reinterpret_cast<const int8x8_t *>(weights[i]);
+        int32x4_t accum = vmovq_n_s32(0);
         for (unsigned j = 0; j < chunks<uint8_t,simdWidth/2>(inputSize); j+=2) {
             // parallel multiply 64-bit chunks into product register
             vec_t prod = vmull_s8(inp[j], row[j]);
@@ -230,7 +230,7 @@ inline void dotProductnx32(const uint8_t *input,
             // sum the products
             accum = vpadalq_s16(accum, prod);
         }
-        output[i] = vaddvq_s32(accum);
+        output[i] = vaddvq_s32(accum) + biases[i];
     }
 #endif
 }

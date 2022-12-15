@@ -95,7 +95,7 @@ static int test_linear() {
 
     alignas(nnue::DEFAULT_ALIGN) InputType inputs[ROWS];
     for (unsigned i = 0; i < ROWS; i++) {
-        inputs[i] = std::max<int>(255,static_cast<InputType>(i));
+        inputs[i] = std::min<int>(127,static_cast<InputType>(i+1));
     }
 
     alignas(nnue::DEFAULT_ALIGN) OutputType output[COLS], computed[COLS];
