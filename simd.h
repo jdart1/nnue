@@ -359,6 +359,7 @@ inline void vec_sub(const InType *in, OutType *out) {
       }
       break;
     }
+#endif        
 #ifdef AVX2
     case 256: {
       const __m256i *inp = reinterpret_cast<const __m256i *>(in);
