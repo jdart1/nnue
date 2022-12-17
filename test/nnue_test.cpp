@@ -324,7 +324,7 @@ static int test_halfkp() {
     }
 
     // test 1st layer output transformer
-    nnue::HalfKaOutput<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, 1024> outputTransform(7,127);
+    nnue::HalfKaOutput<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
 
 #ifdef AVX52
     alignas(64) uint8_t out[HalfKaV2Hm::OutputSize];

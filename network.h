@@ -25,7 +25,7 @@ public:
                               Layer1OutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, Layer1OutputSize>;
+    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, Layer1OutputSize, 127, 7>;
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, Layer1OutputSize, 16>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 15, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
@@ -34,7 +34,7 @@ public:
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
-    Network() :  transformer(new Layer1()), halfKaMultClamp(new HalfKaMultClamp(7, 127)) {
+    Network() :  transformer(new Layer1()), halfKaMultClamp(new HalfKaMultClamp()) {
         for (unsigned i = 0; i < PSQBuckets; ++i) {
             layers[i].push_back(new Layer2());
             layers[i].push_back(new ScaleAndClamper1(127));

@@ -359,7 +359,7 @@ inline void vec_sub(const InType *in, OutType *out) {
       }
       break;
     }
-#endif        
+#endif
 #ifdef AVX2
     case 256: {
       const __m256i *inp = reinterpret_cast<const __m256i *>(in);
@@ -466,7 +466,8 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
         // pack into output
         outp[i] = vcombine_s8(vmovn_s16(out0), vmovn_s16(out1));
     }
-#elif defined(AVX2)
+#else
+#if defined(AVX2)
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
     __m256i *outp = reinterpret_cast<__m256i *>(out);
     if constexpr (size*8 >= 256) {
@@ -507,19 +508,38 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
 #endif
         }
     }
-#else
-#error at least one of: AVX2, SSE2, SSSE3 must be defined
+#endif
 #endif
 }
 
 // implements the 2nd layer of the SFv4 net, transforming the output of one half of the accumulator
 // into a uint8_t vector
-template <typename InType, typename OutType, size_t size>
-static inline void multAndSum(const InType *input, OutType *output, unsigned clampMax, unsigned shift) {
-    static_assert(size % simdWidth == 0);
+template <typename InType, typename OutType, size_t size, unsigned clampMax, unsigned shift>
+static inline void multAndSum(const InType *input, OutType *output) {
     // currently assume fixed size types
     static_assert(sizeof(InType)==2 && sizeof(OutType)==1);
+    static_assert(size*8 >= simdWidth && size*8 % simdWidth == 0);
 
+#ifdef NEON
+    vec_t *outp = reinterpret_cast<vec_t *>(output);
+    const int8x16_t packedZeros = vdupq_n_s16(0);
+    const int8x16_t packedMax = vdupq_n_s16(clampMax);
+    const int16x8_t* inp0 = reinterpret_cast<const int16x8_t* >(input);
+    const int16x8_t* inp1 = reinterpret_cast<const int16x8_t* >(input + size);
+    size_t j = 0;
+    for (size_t i = 0; i < chunks<InType,simdWidth>(size/2); ++i, j += 2) {
+        // load + do min/max
+        const int16x8_t sum0a = vminq_s16(vmaxq_s16(inp0[j + 0],packedZeros), packedMax);
+        const int16x8_t sum0b = vminq_s16(vmaxq_s16(inp0[j + 1],packedZeros), packedMax);
+        const int16x8_t sum1a = vminq_s16(vmaxq_s16(inp1[j + 0],packedZeros), packedMax);
+        const int16x8_t sum1b = vminq_s16(vmaxq_s16(inp1[j + 1],packedZeros), packedMax);
+        // multiply
+        const vec_t prod0 = vmulq_s16(sum0a,sum1a);
+        const vec_t prod1 = vmulq_s16(sum0b,sum1b);
+        // shift + narrow, pack into output register
+        outp[i] = vcombine_s8(vshrn_n_s16(prod0,shift),vshrn_n_s16(prod1,shift));
+    }
+#else
     const vec_t limit = vec_set_16(clampMax);
     const vec_t* inp0 = reinterpret_cast<const vec_t*>(input);
     const vec_t* inp1 = reinterpret_cast<const vec_t*>(input + size);
@@ -554,6 +574,7 @@ static inline void multAndSum(const InType *input, OutType *output, unsigned cla
         outp[i] = _mm_packs_epi16(_mm_srli_epi16(prod0,shift),_mm_srli_epi16(prod1,shift));
 #endif
     }
+#endif
 }
 
 } // namespace simd

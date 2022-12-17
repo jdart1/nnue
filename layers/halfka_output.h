@@ -6,12 +6,11 @@
 
 // Transform the accumulator into first layer output
 template <typename InputType, typename AccumulatorType, typename OutputType, size_t size,
-          size_t alignment = DEFAULT_ALIGN>
+          unsigned clampMax, unsigned scaleFactor, size_t alignment = DEFAULT_ALIGN>
 class HalfKaOutput
     : public TypedLayer<InputType, OutputType, size, size, alignment> {
   public:
-    HalfKaOutput(int scaleFactor, int clampMax)
-        : _scaleFactor(scaleFactor), _clampMax(clampMax) {}
+    HalfKaOutput() = default;
 
     virtual ~HalfKaOutput() = default;
 
@@ -21,9 +20,9 @@ class HalfKaOutput
     }
 
     void postProcessAccum(const AccumulatorType &accum, OutputType *output) const {
-#ifdef SIMD
-        simd::multAndSum<InputType,OutputType,size/2>(accum.getOutput(AccumulatorHalf::Lower),output,_clampMax,_scaleFactor);
-        simd::multAndSum<InputType,OutputType,size/2>(accum.getOutput(AccumulatorHalf::Upper),output + size/2,_clampMax,_scaleFactor);
+#if defined(SIMD)
+        simd::multAndSum<InputType,OutputType,size/2,clampMax,scaleFactor>(accum.getOutput(AccumulatorHalf::Lower),output);
+        simd::multAndSum<InputType,OutputType,size/2,clampMax,scaleFactor>(accum.getOutput(AccumulatorHalf::Upper),output + size/2);
 #else
         size_t offset = 0;
         static const AccumulatorHalf halves[2] = {AccumulatorHalf::Lower, AccumulatorHalf::Upper};
@@ -32,9 +31,9 @@ class HalfKaOutput
             for (size_t i = 0; i < size/2; ++i) {
                 InputType sum0 = input[i];
                 InputType sum1 = input[i + size/2];
-                sum0 = std::clamp<int>(sum0, 0, _clampMax);
-                sum1 = std::clamp<int>(sum1, 0, _clampMax);
-                output[offset + i] = static_cast<OutputType>((sum0 * sum1) >> _scaleFactor);
+                sum0 = std::clamp<int>(sum0, 0, clampMax);
+                sum1 = std::clamp<int>(sum1, 0, clampMax);
+                output[offset + i] = static_cast<OutputType>((sum0 * sum1) >> scaleFactor);
             }
         }
 #endif
@@ -48,8 +47,6 @@ class HalfKaOutput
 #endif
     }
 
-  protected:
-    int _scaleFactor, _clampMax;
 };
 
 #endif
