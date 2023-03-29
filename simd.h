@@ -1,4 +1,4 @@
-// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 #ifndef NNUE_SIMD_H
 #define NNUE_SIMD_H
 
@@ -32,6 +32,22 @@ namespace simd {
     static constexpr size_t simdWidth = 128;
 #else
 #error must set at least one of: AVX512, AVX2, SSSE3, SSE2 or NEON
+#endif
+
+#ifdef NEON
+static inline int32_t add4x32_neon(int32x4_t reg) {
+#if defined(__aarch64__)
+    return vaddvq_s32(reg);
+#else
+    using ints = int32_t[4];
+    ints *inp = reinterpret_cast<ints*>(&reg);
+    int32_t sum = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        sum += (*inp)[i];
+    }
+    return sum;
+#endif
+}
 #endif
 
 template <typename T,unsigned simdWidth>
@@ -132,7 +148,7 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
         // sum the products
         accum = vpadalq_s16(accum, prod);
     }
-    output[0] = vaddvq_s32(accum) + biases[0];
+    output[0] = add4x32_neon(accum) + biases[0];
 #endif
 }
 
@@ -230,7 +246,7 @@ inline void dotProductnx32(const uint8_t *input,
             // sum the products
             accum = vpadalq_s16(accum, prod);
         }
-        output[i] = vaddvq_s32(accum) + biases[i];
+        output[i] = add4x32_neon(accum) + biases[i];
     }
 #endif
 }
@@ -249,7 +265,7 @@ inline void vec_copy(const DataType *in,DataType *out) {
 #elif defined(SSE2) || defined(SSSE3)
         outp[i] = _mm_load_si128(inp+i);
 #elif defined(NEON)
-        outp[i] = vld1q_s64(reinterpret_cast<const long long*>(inp + i));
+        outp[i] = vld1q_s64(reinterpret_cast<const int64_t*>(inp + i));
 #endif
     }
 }
