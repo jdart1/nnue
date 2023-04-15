@@ -1,4 +1,4 @@
-// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_NETWORK_H
 #define _NNUE_NETWORK_H
 
@@ -15,15 +15,14 @@ class Network {
     template <typename ChessInterface> friend class Evaluator;
 
   public:
-    static constexpr size_t HalfKpRows = 64 * (10 * 64 + 1);
-
-    static constexpr size_t HalfKpOutputSize = 256;
+    static constexpr size_t Layer1Rows = 64 * (10 * 64 + 1);
+    static constexpr size_t Layer1OutputSize = 256;
 
     using IndexArray = std::array<int, MAX_INDICES>;
     using OutputType = int32_t;
     using InputType = uint8_t; // output of transformer
-    using Layer1 = HalfKp<uint16_t, int16_t, int16_t, int16_t, HalfKpRows,
-                          HalfKpOutputSize>;
+    using Layer1 = HalfKp<uint16_t, int16_t, int16_t, int16_t, Layer1Rows,
+                          Layer1OutputSize>;
     using AccumulatorType = Layer1::AccumulatorType;
     using AccumulatorOutputType = int16_t;
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 512, 32>;
@@ -56,6 +55,17 @@ class Network {
         for (auto layer : layers) {
             delete layer;
         }
+    }
+
+    template <Color kside>
+    inline static unsigned getIndex(Square kp, Piece p, Square sq) {
+#ifdef NDEBUG
+        return Layer1::getIndex<kside>(kp, p, sq);
+#else
+        auto idx = Layer1::getIndex<kside>(kp, p, sq);
+        assert(idx < Layer1Rows);
+        return idx;
+#endif
     }
 
     // evaluate the net (layers past the first one)
@@ -120,18 +130,6 @@ class Network {
     // 180 degree rotation for Black
     template <Color kside> inline static Square rotate(Square s) {
         return kside == Black ? Square(static_cast<int>(s) ^ 63) : s;
-    }
-
-    template <Color kside>
-    inline static unsigned getIndex(Square kp, Piece p, Square psq) {
-        assert(p != EmptyPiece);
-        Square rkp = rotate<kside>(kp);
-        unsigned pidx = map[p][kside];
-        unsigned idx = (64 * 10 + 1) * static_cast<unsigned>(rkp) +
-                       64 * (pidx - 1) +
-                       static_cast<unsigned>(rotate<kside>(psq)) + 1;
-        assert(idx < HalfKpRows);
-        return idx;
     }
 
   protected:

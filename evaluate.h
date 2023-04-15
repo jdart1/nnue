@@ -1,4 +1,4 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_EVALUATE_H
 #define _NNUE_EVALUATE_H
 
@@ -11,8 +11,8 @@ template <typename ChessInterface> class Evaluator {
             const Square &sq = pair.first;
             const Piece &piece = pair.second;
             if (piece != WhiteKing && piece != BlackKing) {
-                *it++ = nnue::Network::getIndex<kside>(intf.kingSquare(kside),
-                                                       piece, sq);
+                *it++ = Network::getIndex<kside>(intf.kingSquare(kside),
+                                                 piece, sq);
             }
         }
         *it = LAST_INDEX;

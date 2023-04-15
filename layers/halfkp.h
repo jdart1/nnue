@@ -1,4 +1,4 @@
-// Copyright 2020, 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2020, 2021, 2023 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_HALF_KP_H
 #define _NNUE_HALF_KP_H
 
@@ -18,6 +18,23 @@ public:
     virtual ~HalfKp() = default;
 
     using AccumulatorType = Accumulator<OutputType, WeightType, BiasType, outputSize*2>;
+
+    // 180 degree rotation for Black
+    template <Color kside> inline static Square rotate(Square s) {
+        return kside == Black ? Square(static_cast<int>(s) ^ 63) : s;
+    }
+
+    template <Color kside>
+    inline static unsigned getIndex(Square kp, Piece p, Square psq) {
+        assert(p != EmptyPiece);
+        Square rkp = rotate<kside>(kp);
+        unsigned pidx = map[p][kside];
+        unsigned idx = (64 * 10 + 1) * static_cast<unsigned>(rkp) +
+                       64 * (pidx - 1) +
+                       static_cast<unsigned>(rotate<kside>(psq)) + 1;
+        assert(idx < inputSize);
+        return idx;
+    }
 
     // Propagate data through the layer, updating the specified half of the
     // accumulator (side to move goes in lower half).
@@ -66,6 +83,10 @@ public:
     }
 
 private:
+    static constexpr unsigned map[16][2] = {
+        {0, 0}, {1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}, {0, 0},
+        {0, 0}, {2, 1}, {4, 3}, {6, 5}, {8, 7}, {10, 9}, {12, 11}, {0, 0}};
+
     alignas(alignment) BiasType _biases[outputSize];
     alignas(alignment) WeightType _weights[inputSize][outputSize];
 
