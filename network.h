@@ -15,26 +15,26 @@ class Network {
     template <typename ChessInterface> friend class Evaluator;
 
   public:
-    static constexpr size_t Layer1Rows = 64 * (10 * 64 + 1);
-    static constexpr size_t Layer1OutputSize = 256;
+    static constexpr size_t FeatureXformerRows = 64 * (10 * 64 + 1);
+    static constexpr size_t FeatureXformerOutputSize = 256;
 
     using IndexArray = std::array<int, MAX_INDICES>;
     using OutputType = int32_t;
     using InputType = uint8_t; // output of transformer
-    using Layer1 = HalfKp<uint16_t, int16_t, int16_t, int16_t, Layer1Rows,
-                          Layer1OutputSize>;
-    using AccumulatorType = Layer1::AccumulatorType;
+    using FeatureXformer = HalfKp<uint16_t, int16_t, int16_t, int16_t, FeatureXformerRows,
+                          FeatureXformerOutputSize>;
+    using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 512, 32>;
+    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, FeatureXformerOutputSize*2, 32>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
     using ScaleAndClamper = ScaleAndClamp<int32_t, uint8_t, 32, 6>;
-    using Clamper = Clamp<int16_t, uint8_t, 512>;
+    using Clamper = Clamp<int16_t, uint8_t, FeatureXformerOutputSize*2>;
 
     static constexpr size_t BUFFER_SIZE = 2048;
 
     Network() {
-        layers.push_back(new Layer1());
+        layers.push_back(new FeatureXformer());
         layers.push_back(new Clamper(127));
         layers.push_back(new Layer2());
         layers.push_back(new ScaleAndClamper(127));
@@ -60,10 +60,10 @@ class Network {
     template <Color kside>
     inline static unsigned getIndex(Square kp, Piece p, Square sq) {
 #ifdef NDEBUG
-        return Layer1::getIndex<kside>(kp, p, sq);
+        return FeatureXformer::getIndex<kside>(kp, p, sq);
 #else
-        auto idx = Layer1::getIndex<kside>(kp, p, sq);
-        assert(idx < Layer1Rows);
+        auto idx = FeatureXformer::getIndex<kside>(kp, p, sq);
+        assert(idx < FeatureXformerRows);
         return idx;
 #endif
     }

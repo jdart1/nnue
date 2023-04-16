@@ -86,7 +86,7 @@ template <typename ChessInterface> class Evaluator {
             targetHalf, ciSource.getAccumulator(), sourceHalf);
         // update based on diffs
         auto it = network.layers.begin();
-        ((Network::Layer1 *)*it)
+        ((Network::FeatureXformer *)*it)
             ->updateAccum(added, removed, added_count, removed_count,
                           targetHalf, ciTarget.getAccumulator());
         ciTarget.getAccumulator().setState(targetHalf,
@@ -103,7 +103,7 @@ template <typename ChessInterface> class Evaluator {
             if (idx == nnue::LAST_INDEX)
                 break;
         }
-        ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
+        ((Network::FeatureXformer *)*it)->updateAccum(indices, targetHalf, accum);
         accum.setState(targetHalf,AccumulatorState::Computed);
     }
 
@@ -149,7 +149,7 @@ template <typename ChessInterface> class Evaluator {
             else
                 getIndices<Black>(intf, indices);
             auto it = network.layers.begin();
-            ((Network::Layer1 *)*it)->updateAccum(indices, targetHalf, accum);
+            ((Network::FeatureXformer *)*it)->updateAccum(indices, targetHalf, accum);
         }
         accum.setState(targetHalf,AccumulatorState::Computed);
     }
@@ -176,7 +176,7 @@ private:
                 getIndices<Black>(intf, indices);
             AccumulatorHalf targetHalf =
               Network::AccumulatorType::getHalf(intf.sideToMove(), color);
-            reinterpret_cast<Network::Layer1 *>(*(network.layers.begin()))->updateAccum(indices, targetHalf, accum);
+            reinterpret_cast<Network::FeatureXformer *>(*(network.layers.begin()))->updateAccum(indices, targetHalf, accum);
             accum.setState(targetHalf,AccumulatorState::Computed);
         }
     }
