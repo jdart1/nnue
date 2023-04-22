@@ -1,4 +1,4 @@
-// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_NETWORK_H
 #define _NNUE_NETWORK_H
 
@@ -16,17 +16,17 @@ class Network {
     template <typename ChessInterface> friend class Evaluator;
 
 public:
-    static constexpr size_t Layer1OutputSize = 1024;
+    static constexpr size_t FeatureXformerOutputSize = 1024;
 
-    static constexpr size_t Layer1Rows = 22 * Layer1OutputSize;
+    static constexpr size_t FeatureXformerRows = 22 * FeatureXformerOutputSize;
 
     using OutputType = int32_t;
-    using Layer1 = HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, Layer1Rows,
-                              Layer1OutputSize>;
-    using AccumulatorType = Layer1::AccumulatorType;
+    using FeatureXformer = HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, FeatureXformerRows,
+                              FeatureXformerOutputSize>;
+    using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, Layer1OutputSize, 127, 7>;
-    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, Layer1OutputSize, 16>;
+    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, FeatureXformerOutputSize, 127, 7>;
+    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, FeatureXformerOutputSize, 16>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 15, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
     using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 16, 6>;
@@ -34,7 +34,7 @@ public:
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
-    Network() :  transformer(new Layer1()), halfKaMultClamp(new HalfKaMultClamp()) {
+    Network() :  transformer(new FeatureXformer()), halfKaMultClamp(new HalfKaMultClamp()) {
         for (unsigned i = 0; i < PSQBuckets; ++i) {
             layers[i].push_back(new Layer2());
             layers[i].push_back(new ScaleAndClamper1(127));
@@ -65,10 +65,10 @@ public:
     template <Color kside>
     inline static unsigned getIndex(Square kp, Piece p, Square sq) {
 #ifdef NDEBUG
-        return Layer1::getIndex<kside>(kp, p, sq);
+        return FeatureXformer::getIndex<kside>(kp, p, sq);
 #else
-        auto idx = Layer1::getIndex<kside>(kp, p, sq);
-        assert(idx < Layer1Rows);
+        auto idx = FeatureXformer::getIndex<kside>(kp, p, sq);
+        assert(idx < FeatureXformerRows);
         return idx;
 #endif
     }
@@ -131,7 +131,7 @@ public:
     }
 
 protected:
-    Layer1 *transformer;
+    FeatureXformer *transformer;
     HalfKaMultClamp *halfKaMultClamp;
     std::vector<BaseLayer *> layers[PSQBuckets];
 };

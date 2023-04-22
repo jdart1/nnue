@@ -1,4 +1,4 @@
-// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 #include "nnue.h"
 
 #include <algorithm>
@@ -137,12 +137,12 @@ class HalfKaV2Hm {
 
     using OutputType = int16_t;
 
-    using Layer1 =
+    using FeatureXformer =
         nnue::HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, InputSize, OutputSize>;
 
-    using AccumulatorType = Layer1::AccumulatorType;
+    using AccumulatorType = FeatureXformer::AccumulatorType;
 
-    HalfKaV2Hm() : layer1(new Layer1()) {}
+    HalfKaV2Hm() : layer1(new FeatureXformer()) {}
 
     AccumulatorType accum;
 
@@ -150,10 +150,10 @@ class HalfKaV2Hm {
         layer1.get()->setCol(index, vals);
     }
 
-    Layer1 *get() const noexcept { return layer1.get(); }
+    FeatureXformer *get() const noexcept { return layer1.get(); }
 
   private:
-    std::unique_ptr<Layer1> layer1;
+    std::unique_ptr<FeatureXformer> layer1;
 };
 
 static int16_t col1[HalfKaV2Hm::OutputSize];
@@ -165,7 +165,7 @@ static int test_halfkp() {
     const std::string fen =
         "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
 
-    HalfKaV2Hm::Layer1::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
+    HalfKaV2Hm::FeatureXformer::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
     for (size_t i = 0; i < HalfKaV2Hm::OutputSize; i++) {
          col1[i] = -1550 + i;
          col2[i] = 432 + i;
@@ -304,7 +304,7 @@ static int test_halfkp() {
     }
 
     // test PSQ update
-    HalfKaV2Hm::Layer1::PSQWeightType psq_expected[2][nnue::PSQBuckets];
+    HalfKaV2Hm::FeatureXformer::PSQWeightType psq_expected[2][nnue::PSQBuckets];
     for (size_t i = 0; i < nnue::PSQBuckets; ++i) {
         psq_expected[0][i] = psq3[i] + psq4[i];
         psq_expected[1][i] = psq1[i] + psq2[i];
