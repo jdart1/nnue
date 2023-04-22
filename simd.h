@@ -427,7 +427,6 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
     assert(sizeof(OutType)==1);
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
     __m256i *outp = reinterpret_cast<__m256i *>(out);
-    const __m256i zero = _mm256_setzero_si256();
     for (size_t i = 0; i < chunks<OutType,256>(size); ++i) {
         // load 2x256 bit registers of input data
         __m256i words0 = _mm256_load_si256(
@@ -484,12 +483,11 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
     }
 #else
 #if defined(AVX2)
-    const __m256i *inp = reinterpret_cast<const __m256i *>(in);
-    __m256i *outp = reinterpret_cast<__m256i *>(out);
     if constexpr (size*8 >= 256) {
+        const __m256i *inp = reinterpret_cast<const __m256i *>(in);
+        __m256i *outp = reinterpret_cast<__m256i *>(out);
         static_assert(size*8 % 256 == 0,"conditions not met for scale_and_clamp SIMD implementation");
         const __m256i control = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
-        const __m256i zero = _mm256_setzero_si256();
         for (size_t i = 0; i < chunks<OutType,256>(size); ++i) {
             // load 2x256 bit registers of shifted input data (32 bit input, 16 bit output)
             const __m256i r1  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);

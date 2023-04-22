@@ -313,8 +313,8 @@ static int test_halfkp() {
         nnue::AccumulatorHalf::Upper};
     for (auto half : halfs) {
         for (size_t i = 0; i < nnue::PSQBuckets; ++i) {
-            auto expected = psq_expected[half == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
-            if (expected != accum.getPSQ(half)[i]) {
+            auto expect = psq_expected[half == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
+            if (expect != accum.getPSQ(half)[i]) {
                 ++errs;
                 std::cerr << " error at psq index " << int(i)
                           << " expected: " << expected << " actual "
