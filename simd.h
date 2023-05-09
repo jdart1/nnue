@@ -503,22 +503,17 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
     {
         const __m128i *inp = reinterpret_cast<const __m128i *>(in);
         __m128i *outp = reinterpret_cast<__m128i *>(out);
-#ifdef SSE41
-        const __m128i zero = _mm_setzero_si128();
-#else
-        const __m128i k0x80s = _mm_set1_epi8(-128);
-#endif
         static_assert(size*8 % 128 == 0,"conditions not met for scale_and_clamp SIMD implementation");
         for (size_t i = 0; i < chunks<OutType,128>(size); ++i) {
             // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and clamp
             __m128i r1  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
             __m128i r2  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
             // pack into 8-bit output and clamp
-            outp[i] =
 #ifdef SSE41
-                _mm_max_epi8(_mm_packs_epi16(r1, r2), zero);
+            outp[i] = _mm_max_epi8(_mm_packs_epi16(r1, r2), _mm_setzero_si128());
 #else
-            _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(r1, r2), k0x80s), k0x80s);
+            const __m128i k0x80s = _mm_set1_epi8(-128);
+            outp[i] = _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(r1, r2), k0x80s), k0x80s);
 #endif
         }
     }
