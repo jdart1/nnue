@@ -66,7 +66,6 @@ public:
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
         }
-        std::cout << std::endl;
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
             for (size_t j = 0; j < outputSize && s.good(); ++j) {
                 _weights[i][j] = read_little_endian<WeightType>(s);
