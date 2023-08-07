@@ -18,12 +18,14 @@ namespace simd {
     static const vec_t ones512 = _mm512_set1_epi16(1);
     static const __m256i ones256 = _mm256_set1_epi16(1);
     static const vec_t zero = _mm512_setzero_epi32();
+    static const __m256i zero256 = _mm256_setzero_si256();
     static inline vec_t vec_set_16(int x) { return _mm512_set1_epi16(x); }
 #elif defined(AVX2)
     using vec_t = __m256i;
     static constexpr size_t simdWidth = 256;
     static const vec_t ones256 = _mm256_set1_epi16(1);
     static const vec_t zero = _mm256_setzero_si256();
+    static const vec_t &zero256 = zero;
     static inline vec_t vec_set_16(int x) { return _mm256_set1_epi16(x); }
 #elif defined(SSE2) || defined(SSSE3)
     using vec_t = __m128i;
@@ -437,7 +439,7 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
         _mm256_store_si256(
             &outp[i],
             _mm256_permute4x64_epi64(
-                _mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero),
+                _mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero256),
                 0b11011000));
     }
 #elif defined(SSE2) || defined(SSSE3)
@@ -493,7 +495,7 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
             const __m256i r1  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
             const __m256i r2  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
             // clamp and store into one 256-bit output chunk
-            outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero), control);
+            outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero256), control);
         }
         return;
     }
