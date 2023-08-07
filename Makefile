@@ -1,13 +1,14 @@
 #
-# Copyright 2020-2022 by Jon Dart. All Rights Reserved.
+# Copyright 2020-2023 by Jon Dart. All Rights Reserved.
 #
+# typical build flags for different architectures, select one
 ARCH_FLAGS := -DSIMD -DSSE2 -DAVX2 -DUSE_POPCNT -DSSSE3 -DSSE41 -mavx2 -mbmi2 -msse4.1 -msse4.2 -mpopcnt
+#ARCH_FLAGS = -mavx2 -mbmi2 -msse2 -DSIMD -DAVX2 -DAVX512 -mavx512bw
+#ARCH_FLAGS = -DSIMD -DNEON -mcpu=apple-m1
 
 OPT := -O3
 NNUE_FLAGS = -I. -std=c++17 -Wall -Wextra -Wpedantic -Wshadow
 
-ARCH_FLAGS = -mavx2 -mbmi2 -msse2 -DSIMD -DAVX2
-#ARCH_FLAGS = -DSIMD -DNEON -mcpu=apple-m1
 
 NN_LIBS := -lstdc++ -lc -lm
 
