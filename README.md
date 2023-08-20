@@ -4,7 +4,7 @@ This code provides an implementation of a [Efficiently Updatable Neural Network 
 
 ## Copyright, license
 
-Copyright 2021-2022 by Jon Dart. All Rights Reserved.
+Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 
 MIT Licensed.
 
