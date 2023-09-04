@@ -1,10 +1,10 @@
 # nnue
 
-This code provides an implementation of a [Efficiently Updatable Neural Network (NNUE)](https://www.chessprogramming.org/NNUE) for chess, compatible with the original implementation in [Stockfish](https://github.com/official-stockfish/Stockfish), which was based on contributions from Hisayori Noda aka Nodchip..
+This code provides an implementation of a [Efficiently Updatable Neural Network (NNUE)](https://www.chessprogramming.org/NNUE) for chess, compatible with the original implementation in [Stockfish](https://github.com/official-stockfish/Stockfish), which was based on contributions from Hisayori Noda aka Nodchip. Now also supporting the SFNNv4 network architecture, via the SFv4 branch.
 
 ## Copyright, license
 
-Copyright 2021-2022 by Jon Dart. All Rights Reserved.
+Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 
 MIT Licensed.
 
