@@ -1,4 +1,4 @@
-// Copyright 2021-2022 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_EVALUATE_H
 #define _NNUE_EVALUATE_H
 
