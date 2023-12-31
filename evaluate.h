@@ -23,13 +23,10 @@ public:
                                   size_t &removed_count) {
         const Square kp = intf.kingSquare(kside);
         const unsigned dn = intf.getDirtyNum();
-        size_t i;
-        for (i = 0; i < dn; i++) {
+        for (size_t i = 0; i < dn; i++) {
             Piece piece;
             Square from, to;
             intf.getDirtyState(i, from, to, piece);
-            //if (isKing(piece))
-            //    continue;
             if (from != InvalidSquare) {
                 removed[removed_count++] =
                     Network::getIndex<kside>(kp, piece, from);
@@ -86,10 +83,6 @@ public:
                             Color sideToMove, Network::AccumulatorType &accum) {
         AccumulatorHalf targetHalf =
             Network::AccumulatorType::getHalf(c, sideToMove);
-        for (auto idx : indices) {
-            if (idx == nnue::LAST_INDEX)
-                break;
-        }
         network.updateAccum(indices, targetHalf, accum);
         accum.setState(targetHalf,AccumulatorState::Computed);
     }

@@ -1,4 +1,4 @@
-// Copyright 2021, 2022 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
 #ifndef _CHESS_INTERFACE_H
 #define _CHESS_INTERFACE_H
 
@@ -122,7 +122,7 @@ inline bool operator==(const ChessInterface &intf,
 
 inline bool operator!=(const ChessInterface &intf,
                        const ChessInterface &other) {
-    return intf.pos == other.pos;
+    return intf.pos != other.pos;
 }
 
 #endif

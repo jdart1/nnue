@@ -9,7 +9,6 @@ ARCH_FLAGS := -DSIMD -DSSE2 -DAVX2 -DUSE_POPCNT -DSSSE3 -DSSE41 -mavx2 -mbmi2 -m
 OPT := -O3
 NNUE_FLAGS = -I. -std=c++17 -Wall -Wextra -Wpedantic -Wshadow
 
-
 NN_LIBS := -lstdc++ -lc -lm
 
 CFLAGS := $(NNUE_FLAGS) $(ARCH_FLAGS) $(OPT) -std=c++17 -I.
@@ -41,16 +40,16 @@ clean: dirs
 	cd $(EXPORT) && rm -f nnue_test
 
 $(BUILD)/%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(DEBUG) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: layers/%.cpp
-	$(CXX) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(DEBUG) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: test/%.cpp
-	$(CXX) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(DEBUG) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: interface/%.cpp
-	$(CXX) $(CXXFLAGS) $(OPT) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(DEBUG) $(CFLAGS) -c -o $@ $<
 
 $(EXPORT)/nnue_test: dirs $(NNUE_OBJS)
 	$(LD) $(OPT) $(LDFLAGS) $(NNUE_OBJS) $(DEBUG) -o $(BUILD)/nnue_test $(NN_LIBS)

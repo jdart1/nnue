@@ -346,97 +346,93 @@ static int test_halfkp() {
     return errs;
 }
 
+template<nnue::Color c>
+static void getIndices(const ChessInterface &ci,
+                       nnue::IndexArray &a,
+                       std::set<nnue::IndexType> &indices) {
+    nnue::Evaluator<ChessInterface>::getIndices<c>(ci,a);
+    for (auto it = a.begin(); it != a.end() && *it != nnue::LAST_INDEX; it++) {
+        indices.insert(*it);
+    }
+}
+
+static void getSetDiff(const std::set<nnue::IndexType> &a, const std::set<nnue::IndexType> &b,
+                       std::set<nnue::IndexType> &out) {
+    out.clear();
+    std::set_difference(a.begin(),a.end(),b.begin(),b.end(),std::inserter(out, out.end()));
+}
+
+static void getIndexDiffs(nnue::Evaluator<ChessInterface> evaluator, nnue::Color c,
+                          const ChessInterface &ciSource, const ChessInterface &ciTarget,
+                          std::set<nnue::IndexType> &added, std::set<nnue::IndexType> &removed) {
+    nnue::IndexArray addedArray, removedArray;
+    size_t addedCount, removedCount;
+    evaluator.getIndexDiffs(ciSource, ciTarget, c, addedArray, removedArray,
+                            addedCount, removedCount);
+    for (size_t i = 0; i < addedCount; ++i) {
+        added.insert(addedArray[i]);
+    }
+    for (size_t i = 0; i < removedCount; ++i) {
+        removed.insert(removedArray[i]);
+    }
+    // diff algorithm may place items in both removed and added
+    // lists. Filter these out.
+    std::vector<nnue::IndexType> intersect(32);
+    std::set_intersection(
+        removed.begin(), removed.end(), added.begin(), added.end(),
+        std::back_inserter(intersect));
+    for (auto x : intersect) {
+        added.erase(x);;
+        removed.erase(x);
+    }
+}
+
 static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
     int errs = 0;
+    assert(ciSource != ciTarget);
 
-    nnue::IndexArray bIndices, wIndices;
+    std::set<nnue::IndexType> baseW, baseB, targetW, targetB;
+    nnue::IndexArray wIndicesSource, bIndicesSource, wIndicesTarget,
+        bIndicesTarget;
+    getIndices<nnue::White>(ciSource,wIndicesSource,baseW);
+    getIndices<nnue::Black>(ciSource,bIndicesSource,baseB);
+    getIndices<nnue::White>(ciTarget,wIndicesTarget,targetW);
+    getIndices<nnue::Black>(ciTarget,bIndicesTarget,targetB);
 
-    std::set<nnue::IndexType> base, target;
-
-    nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(ciSource,
-                                                             wIndices);
-    nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(ciSource,
-                                                             bIndices);
-    for (auto it = wIndices.begin();
-         it != wIndices.end() && *it != nnue::LAST_INDEX; it++) {
-        base.insert(*it);
-    }
-    for (auto it = bIndices.begin();
-         it != bIndices.end() && *it != nnue::LAST_INDEX; it++) {
-        base.insert(*it);
-    }
-
-    nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(ciTarget,
-                                                             wIndices);
-    nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(ciTarget,
-                                                             bIndices);
-    for (auto it = wIndices.begin();
-         it != wIndices.end() && *it != nnue::LAST_INDEX; it++) {
-        target.insert(*it);
-    }
-    for (auto it = bIndices.begin();
-         it != bIndices.end() && *it != nnue::LAST_INDEX; it++) {
-        target.insert(*it);
-    }
-
-    std::vector<nnue::IndexType> added(32), removed(32);
-
-    auto itend = std::set_difference(base.begin(), base.end(), target.begin(),
-                                     target.end(), removed.begin());
-    removed.resize(itend - removed.begin());
-    itend = std::set_difference(target.begin(), target.end(), base.begin(),
-                                base.end(), added.begin());
-    added.resize(itend - added.begin());
+    std::set<nnue::IndexType> addedW, addedB, removedW, removedB;
+    getSetDiff(baseW, targetW, removedW);
+    getSetDiff(baseB, targetB, removedB);
+    getSetDiff(targetW, baseW, addedW);
+    getSetDiff(targetB, baseB, addedB);
 
     nnue::Evaluator<ChessInterface> evaluator;
 
     nnue::Network network;
 
     // have Evaluator calculate index diffs
-    nnue::IndexArray wRemoved, wAdded, bRemoved, bAdded;
-    size_t wAddedCount, wRemovedCount, bAddedCount, bRemovedCount;
-    evaluator.getIndexDiffs(ciSource, ciTarget, nnue::White, wAdded, wRemoved,
-                            wAddedCount, wRemovedCount);
-    evaluator.getIndexDiffs(ciSource, ciTarget, nnue::Black, bAdded, bRemoved,
-                            bAddedCount, bRemovedCount);
+    std::set<nnue::IndexType> addedFromEvaluatorW,
+        addedFromEvaluatorB,
+        removedFromEvaluatorW,
+        removedFromEvaluatorB;
 
-    // diffs
-    std::set<nnue::IndexType> removedAll, addedAll;
-    for (size_t i = 0; i < wRemovedCount; i++)
-        removedAll.insert(wRemoved[i]);
-    for (size_t i = 0; i < bRemovedCount; i++)
-        removedAll.insert(bRemoved[i]);
-    for (size_t i = 0; i < wAddedCount; i++)
-        addedAll.insert(wAdded[i]);
-    for (size_t i = 0; i < bAddedCount; i++)
-        addedAll.insert(bAdded[i]);
+    getIndexDiffs(evaluator,nnue::White,ciSource,ciTarget,addedFromEvaluatorW,removedFromEvaluatorW);
+    getIndexDiffs(evaluator,nnue::Black,ciSource,ciTarget,addedFromEvaluatorB,removedFromEvaluatorB);
 
-    std::vector<nnue::IndexType> intersect(32);
-    auto intersect_end = std::set_intersection(
-        removedAll.begin(), removedAll.end(), addedAll.begin(), addedAll.end(),
-        intersect.begin());
-    // diff algorithm may place items in both removed and added
-    // lists. Filter these out.
-    for (auto it = intersect.begin(); it != intersect_end; it++) {
-        addedAll.erase(*it);
-        removedAll.erase(*it);
-    }
-
-    std::vector<nnue::IndexType> diffs(32);
-    itend = std::set_difference(removedAll.begin(), removedAll.end(),
-                                removed.begin(), removed.end(), diffs.begin());
-    diffs.resize(itend - diffs.begin());
-    if (diffs.size() != 0) {
+    if (addedW != addedFromEvaluatorW) {
         ++errs;
-        std::cerr << "removed list differs" << std::endl;
+        std::cerr << "added list differs (W)" << std::endl;
     }
-    diffs.clear();
-    itend = std::set_difference(addedAll.begin(), addedAll.end(), added.begin(),
-                                added.end(), diffs.begin());
-    diffs.resize(itend - diffs.begin());
-    if (diffs.size() != 0) {
+    if (addedB != addedFromEvaluatorB) {
         ++errs;
-        std::cerr << "added list differs" << std::endl;
+        std::cerr << "added list differs (B)" << std::endl;
+    }
+    if (removedW != removedFromEvaluatorW) {
+        ++errs;
+        std::cerr << "removed list differs (W)" << std::endl;
+    }
+    if (removedB != removedFromEvaluatorB) {
+        ++errs;
+        std::cerr << "removed list differs (B)" << std::endl;
     }
 
     HalfKaV2Hm halfKp;
@@ -451,16 +447,16 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
         halfKp.get()->setCol(i, col);
     }
 
-    // Full evaluation of 1st layer for source position
-    evaluator.updateAccum(network, wIndices, nnue::White, ciSource.sideToMove(),
+    // Full evaluation of feature transformer for source position
+    evaluator.updateAccum(network, wIndicesSource, nnue::White, ciSource.sideToMove(),
                           ciSource.getAccumulator());
-    evaluator.updateAccum(network, bIndices, nnue::Black, ciSource.sideToMove(),
+    evaluator.updateAccum(network, bIndicesSource, nnue::Black, ciSource.sideToMove(),
                           ciSource.getAccumulator());
 
-    // Full evaluation of 1st layer for target position into "accum"
-    evaluator.updateAccum(network, wIndices, nnue::White, ciTarget.sideToMove(),
+    // Full evaluation of feature transformer for target position into "accum"
+    evaluator.updateAccum(network, wIndicesTarget, nnue::White, ciTarget.sideToMove(),
                           accum);
-    evaluator.updateAccum(network, bIndices, nnue::Black, ciTarget.sideToMove(),
+    evaluator.updateAccum(network, bIndicesTarget, nnue::Black, ciTarget.sideToMove(),
                           accum);
 
     assert(ciTarget.getAccumulator().getState(nnue::AccumulatorHalf::Lower) ==
@@ -472,7 +468,7 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
     evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::White);
     evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::Black);
 
-    // Compare evals
+    // Compare incremental and full eval
     auto old_errs = errs;
     errs += ciTarget.getAccumulator() != accum;
     if (errs != old_errs) {
@@ -516,9 +512,9 @@ static int test_incremental() {
     ChessInterface ciTarget(&target_pos);
     // set up dirty status
     // d5 pawn x c4 pawn
-    source_pos.dirty[source_pos.dirty_num++] =
+    target_pos.dirty[target_pos.dirty_num++] =
         DirtyState(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn);
-    source_pos.dirty[source_pos.dirty_num++] =
+    target_pos.dirty[target_pos.dirty_num++] =
         DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::WhitePawn);
     // connect target to previous position
     target_pos.previous = &source_pos;
@@ -526,17 +522,17 @@ static int test_incremental() {
     errs += test_incr(ciSource, ciTarget);
 
     Position target2_pos(target2_fen);
+
+    // Try a position 2 half-moves ahead
+    target2_pos.dirty[target2_pos.dirty_num++] =
+        DirtyState(12 /*E2*/, 26 /*C4*/, nnue::WhiteBishop);
+    target2_pos.dirty[target2_pos.dirty_num++] =
+        DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::BlackPawn);
+    target2_pos.previous = &target_pos;
     ChessInterface ciTarget2(&target2_pos);
 
-    // Try a position 2 half-moves back
-    target_pos.dirty[target_pos.dirty_num++] =
-        DirtyState(12 /*E2*/, 26 /*C4*/, nnue::WhiteBishop);
-    target_pos.dirty[target_pos.dirty_num++] =
-        DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::BlackPawn);
-
-    target2_pos.previous = &target_pos;
-
     ciTarget.getAccumulator().setEmpty();
+    ciTarget2.getAccumulator().setEmpty();
 
     errs += test_incr(ciSource, ciTarget2);
 
