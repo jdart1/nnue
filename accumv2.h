@@ -1,4 +1,4 @@
-// Copyright 2021, 2022 by Jon Dart. All Rigths Reserved.
+// Copyright 2021-2023 by Jon Dart. All Rigths Reserved.
 #ifndef _NNUE_ACCUM_V2_H
 #define _NNUE_ACCUM_V2_H
 
@@ -66,7 +66,7 @@ class AccumulatorV2 {
                                      psq_buckets,
                                      alignment> &source,
                    AccumulatorHalf sourceHalf) {
-        const OutputType *in = source._accum[halfToIndex(sourceHalf)];
+        const WeightType *in = source._accum[halfToIndex(sourceHalf)];
         OutputType *out = _accum[halfToIndex(half)];
 #ifdef SIMD
         simd::vec_copy<size,OutputType>(in,out);
@@ -78,49 +78,45 @@ class AccumulatorV2 {
         std::memcpy(_psq_accum[halfToIndex(half)],source._psq_accum[halfToIndex(sourceHalf)],sizeof(PSQType)*psq_buckets);
     }
 
-    // Update half of the accumulator
+    // Update half of the accumulator (does not use SIMD)
     void add_half(AccumulatorHalf half, const WeightType *data, const PSQType *psqData) {
-        const OutputType *in = data;
+        const WeightType *in = data;
         OutputType *out = _accum[halfToIndex(half)];
         const PSQType *psq_in = psqData;
         PSQType *psq_out = _psq_accum[halfToIndex(half)];
-#ifdef SIMD
-        simd::vec_add<size,WeightType,OutputType>(in,out);
-        simd::vec_add<PSQBuckets,PSQType,PSQType>(psq_in,psq_out);
-#else
         for (size_t i = 0; i < size; ++i) {
             *out++ += static_cast<OutputType>(*in++);
         }
         for (size_t i = 0; i < psq_buckets; ++i) {
             *psq_out++ += static_cast<OutputType>(*psq_in++);
         }
-#endif
     }
 
-    // Update half of the accumulator
+    // Update half of the accumulator (does not use SIMD)
     void sub_half(AccumulatorHalf half, const WeightType *data, const PSQType *psqData) {
         const OutputType *in = data;
         OutputType *out = _accum[halfToIndex(half)];
         const PSQType *psq_in = psqData;
         PSQType *psq_out = _psq_accum[halfToIndex(half)];
-#ifdef SIMD
-        simd::vec_sub<size,WeightType,OutputType>(in,out);
-        simd::vec_sub<PSQBuckets,PSQType,PSQType>(psq_in,psq_out);
-#else
         for (size_t i = 0; i < size; ++i) {
             *out++ -= static_cast<OutputType>(*in++);
         }
         for (size_t i = 0; i < psq_buckets; ++i) {
             *psq_out++ -= static_cast<OutputType>(*psq_in++);
         }
-#endif
     }
 
     OutputPtr getOutput() const noexcept { return _accum; }
 
     const OutputType *getOutput(AccumulatorHalf half) const noexcept { return _accum[halfToIndex(half)]; }
 
+    OutputType * data(AccumulatorHalf half) { return _accum[halfToIndex(half)]; }
+
     const PSQType *getPSQ(AccumulatorHalf half) const noexcept {
+        return _psq_accum[halfToIndex(half)];
+    }
+
+    PSQType *PSQData(AccumulatorHalf half) {
         return _psq_accum[halfToIndex(half)];
     }
 
@@ -187,7 +183,6 @@ template <typename OutputType, typename WeightType, typename BiasType,
 inline std::ostream & operator << (std::ostream &o, const AccumulatorV2<OutputType,
                             WeightType, BiasType, PSQType, size,
                             psq_buckets, alignment> &accum) {
-    std::cout << std::endl << "-----" << std::endl;
     for (unsigned p = 0; p < 2; ++p) {
         std::cout << "perspective " << p << std::endl;
         for (unsigned i = 0; i < size; ++i) {
@@ -195,7 +190,6 @@ inline std::ostream & operator << (std::ostream &o, const AccumulatorV2<OutputTy
             if ((i+1)%64==0) std::cout << std::endl;
         }
     }
-    std::cout << std::endl << "psq: " << std::endl;
     for (unsigned p = 0; p < 2; ++p) {
         for (unsigned i = 0; i<PSQBuckets; ++i) {
             std::cout << static_cast<int>(accum._psq_accum[p][i]) << ' ';
@@ -218,11 +212,13 @@ inline bool operator == (const AccumulatorV2<_OutputType,
     for (size_t h = 0; h < 2; ++h) {
         for (size_t i = 0; i < _size; ++i) {
             if (p[h][i] != q[h][i]) {
+                std::cout << "mismatch in accum" << std::endl;
                 return false;
             }
         }
         for (size_t i = 0; i < PSQBuckets; i++) {
             if (accum1._psq_accum[h][i] != accum2._psq_accum[h][i]) {
+                std::cout << "mismatch in psq" << std::endl;
                 return false;
             }
         }

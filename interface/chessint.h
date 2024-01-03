@@ -115,6 +115,19 @@ class ChessInterface {
     Position *pos;
 };
 
+inline bool operator==(const Position &pos1,
+                       const Position &pos2) {
+    return pos1.stm == pos2.stm &&
+        pos1.locs == pos2.locs &&
+        pos1.kings[0] == pos2.kings[0] &&
+        pos1.kings[1] == pos2.kings[1];
+}
+
+inline bool operator!=(const Position &pos1,
+                       const Position &pos2) {
+    return !(pos1 == pos2);
+}
+
 inline bool operator==(const ChessInterface &intf,
                        const ChessInterface &other) {
     return intf.pos == other.pos;

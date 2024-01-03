@@ -439,6 +439,7 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
 
     HalfKaV2Hm::AccumulatorType accum;
 
+    // set some weights
     for (size_t i = 0; i < HalfKaV2Hm::InputSize; i++) {
         HalfKaV2Hm::OutputType col[HalfKaV2Hm::OutputSize];
         for (size_t j = 0; j < HalfKaV2Hm::OutputSize; j++) {
@@ -519,6 +520,7 @@ static int test_incremental() {
     // connect target to previous position
     target_pos.previous = &source_pos;
 
+    // test incremental update
     errs += test_incr(ciSource, ciTarget);
 
     Position target2_pos(target2_fen);

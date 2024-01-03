@@ -1,4 +1,4 @@
-// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2024 by Jon Dart. All Rights Reserved.
 #ifndef NNUE_SIMD_H
 #define NNUE_SIMD_H
 
@@ -13,33 +13,71 @@ extern "C" {
 namespace simd {
 
 #ifdef AVX512
-    using vec_t = __m512i;
-    static constexpr size_t simdWidth = 512;
-    static const vec_t ones512 = _mm512_set1_epi16(1);
-    static const __m256i ones256 = _mm256_set1_epi16(1);
-    static const vec_t zero = _mm512_setzero_epi32();
-    static const __m256i zero256 = _mm256_setzero_si256();
-    static inline vec_t vec_set_16(int x) { return _mm512_set1_epi16(x); }
+using vec_t = __m512i;
+static constexpr size_t simdWidth = 512;
+static constexpr size_t simdRegCount = 32;
+static const vec_t ones512 = _mm512_set1_epi16(1);
+static const __m256i ones256 = _mm256_set1_epi16(1);
+static const vec_t zero = _mm512_setzero_epi32();
+static const __m256i zero256 = _mm256_setzero_si256();
+static inline vec_t vec_set_16(int x) { return _mm512_set1_epi16(x); }
+static inline vec_t vec_load(const vec_t *x) { return _mm512_load_si512(x); }
+static inline void vec_store(vec_t *x, vec_t y) { _mm512_store_si512(x, y); }
+static inline vec_t vec_add16(vec_t x, const vec_t *y) { return _mm512_add_epi16(x, vec_load(y)); }
+static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm512_add_epi32(x, vec_load(y)); }
+static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm512_sub_epi16(x, vec_load(y)); }
+static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm512_sub_epi32(x, vec_load(y)); }
 #elif defined(AVX2)
-    using vec_t = __m256i;
-    static constexpr size_t simdWidth = 256;
-    static const vec_t ones256 = _mm256_set1_epi16(1);
-    static const vec_t zero = _mm256_setzero_si256();
-    static const vec_t &zero256 = zero;
-    static inline vec_t vec_set_16(int x) { return _mm256_set1_epi16(x); }
+using vec_t = __m256i;
+static constexpr size_t simdWidth = 256;
+static constexpr size_t simdRegCount = 16;
+static const vec_t ones256 = _mm256_set1_epi16(1);
+static const vec_t zero = _mm256_setzero_si256();
+static const vec_t &zero256 = zero;
+static inline vec_t vec_set_16(int x) { return _mm256_set1_epi16(x); }
+static inline vec_t vec_load(const vec_t *x) { return _mm256_load_si256(x); }
+static inline void vec_store(vec_t *x, vec_t y) { _mm256_store_si256(x, y); }
+static inline vec_t vec_add16(vec_t x, const vec_t *y) { return _mm256_add_epi16(x, vec_load(y)); }
+static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm256_add_epi32(x, vec_load(y)); }
+static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm256_sub_epi16(x, vec_load(y)); }
+static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm256_sub_epi32(x, vec_load(y)); }
 #elif defined(SSE2) || defined(SSSE3)
-    using vec_t = __m128i;
-    static const vec_t ones128 = _mm_set1_epi16(1);
-    static constexpr size_t simdWidth = 128;
-    static const vec_t zero = _mm_setzero_si128();
-    static inline vec_t vec_set_16(int x) { return _mm_set1_epi16(x); }
+using vec_t = __m128i;
+static constexpr size_t simdWidth = 128;
+static constexpr size_t simdRegCount = 16;
+static const vec_t ones128 = _mm_set1_epi16(1);
+static const vec_t zero = _mm_setzero_si128();
+static inline vec_t vec_set_16(int x) { return _mm_set1_epi16(x); }
+static inline vec_t vec_load(const vec_t *x) { return _mm_load_si128(x); }
+static inline void vec_store(vec_t *x, vec_t y) { _mm_store_si128(x, y); }
+static inline vec_t vec_add16(vec_t x, const vec_t *y) { return _mm_add_epi16(x, vec_load(y)); }
+static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm_add_epi32(x, vec_load(y)); }
+static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm_sub_epi16(x, vec_load(y)); }
+static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm_sub_epi32(x, vec_load(y)); }
 #elif defined(NEON)
-    using vec_t = int16x8_t;
-    static const vec_t ones128 = vdupq_n_s16(1);
-    static const vec_t zeros128 = vdupq_n_s16(0);
-    static constexpr size_t simdWidth = 128;
+using vec_t = int16x8_t;
+static constexpr size_t simdWidth = 128;
+static constexpr size_t simdRegCount = 16;
+static const vec_t ones128 = vdupq_n_s16(1);
+static const vec_t zeros128 = vdupq_n_s16(0);
 #else
 #error must set at least one of: AVX512, AVX2, SSSE3, SSE2 or NEON
+#endif
+
+#ifndef NEON
+template <size_t bytes> static inline vec_t vec_add(vec_t x, const vec_t *y) {
+    if constexpr (bytes == 2)
+        return vec_add16(x, y);
+    else // (bytes==4)
+        return vec_add32(x, y);
+}
+
+template <size_t bytes> static inline vec_t vec_sub(vec_t x, const vec_t *y) {
+    if constexpr (bytes == 2)
+        return vec_sub16(x, y);
+    else // (bytes==4)
+        return vec_sub32(x, y);
+}
 #endif
 
 #ifdef NEON
@@ -48,7 +86,7 @@ static inline int32_t add4x32_neon(int32x4_t reg) {
     return vaddvq_s32(reg);
 #else
     using ints = int32_t[4];
-    ints *inp = reinterpret_cast<ints*>(&reg);
+    ints *inp = reinterpret_cast<ints *>(&reg);
     int32_t sum = 0;
     for (unsigned i = 0; i < 4; ++i) {
         sum += (*inp)[i];
@@ -58,8 +96,7 @@ static inline int32_t add4x32_neon(int32x4_t reg) {
 }
 #endif
 
-template <typename T,unsigned simdWidth>
-inline static size_t chunks(unsigned len) {
+template <typename T, unsigned simdWidth> inline static size_t chunks(unsigned len) {
     return (len * 8 * sizeof(T)) / simdWidth;
 }
 
@@ -75,8 +112,7 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     __m256i prod = _mm256_maddubs_epi16(inp[0], row[0]);
     prod = _mm256_madd_epi16(prod, ones256);
 #endif
-    __m128i sum128 = _mm_add_epi32(_mm256_castsi256_si128(prod),
-                                   _mm256_extracti128_si256(prod, 1));
+    __m128i sum128 = _mm_add_epi32(_mm256_castsi256_si128(prod), _mm256_extracti128_si256(prod, 1));
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_BADC));
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_CDAB));
     *output = _mm_cvtsi128_si32(sum128) + biases[0];
@@ -97,10 +133,10 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     const vec_t zeros = _mm_setzero_si128();
     vec_t sum_lo, sum_hi;
     sum_lo = sum_hi = zeros;
-    const auto row = reinterpret_cast<const vec_t*>(weights);
-    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+    const auto row = reinterpret_cast<const vec_t *>(weights);
+    const vec_t *inp = reinterpret_cast<const vec_t *>(input);
     constexpr unsigned inputSize = 32;
-    for (unsigned j = 0; j < chunks<uint8_t,simdWidth>(inputSize); ++j) {
+    for (unsigned j = 0; j < chunks<uint8_t, simdWidth>(inputSize); ++j) {
         __m128i row_j = _mm_load_si128(&row[j]);
         __m128i input_j = _mm_load_si128(&inp[j]);
         __m128i row_signs = _mm_cmpgt_epi8(zeros, row_j);
@@ -124,11 +160,11 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
     const int8x8_t *row = reinterpret_cast<const int8x8_t *>(weights);
     constexpr unsigned inputSize = 32;
     int32x4_t accum = vmovq_n_s32(0);
-    for (unsigned i = 0; i < chunks<uint8_t,simdWidth/2>(inputSize); i+=2) {
+    for (unsigned i = 0; i < chunks<uint8_t, simdWidth / 2>(inputSize); i += 2) {
         // parallel multiply 64-bit chunks into product register
         vec_t prod = vmull_s8(inp[i], row[i]);
         // multiply and add next 64 bits
-        prod = vmlal_s8(prod, inp[i+1], row[i+1]);
+        prod = vmlal_s8(prod, inp[i + 1], row[i + 1]);
         // sum the products
         accum = vpadalq_s16(accum, prod);
     }
@@ -137,7 +173,7 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
 }
 
 #ifdef AVX512
-[[maybe_unused]] auto inline m512_add_dpbusd_epi32(__m512i& acc, __m512i a, __m512i b) {
+[[maybe_unused]] auto inline m512_add_dpbusd_epi32(__m512i &acc, __m512i a, __m512i b) {
 #ifdef AVX512_VNNI
     acc = _mm512_dpbusd_epi32(acc, a, b);
 #else
@@ -149,7 +185,7 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
 #endif
 
 #ifdef AVX2
-[[maybe_unused]] auto inline m256_add_dpbusd_epi32(__m256i& acc, __m256i a, __m256i b) {
+[[maybe_unused]] auto inline m256_add_dpbusd_epi32(__m256i &acc, __m256i a, __m256i b) {
 #ifdef VNNI
     acc = _mm256_dpbusd_epi32(acc, a, b);
 #else
@@ -160,18 +196,16 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
 }
 
 inline int32_t m256_hadd_8x32(__m256i prod) {
-  __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod),
-                              _mm256_extracti128_si256(prod, 1));
-  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
-  return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
+    __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod), _mm256_extracti128_si256(prod, 1));
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
+    return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
 }
 #endif
 
 // dot product, input of at least 32 to output > 1
 // input uint_8t, output int32_t
 template <size_t inputSize, size_t roundedInputSize, size_t outputSize>
-inline void dotProductnxn(const uint8_t *input,
-                          const int8_t weights[outputSize][roundedInputSize],
+inline void dotProductnxn(const uint8_t *input, const int8_t weights[outputSize][roundedInputSize],
                           const int32_t *biases, int32_t *output) {
 #ifdef AVX512
     if constexpr (inputSize >= 64 && inputSize % 64 == 0) {
@@ -183,7 +217,7 @@ inline void dotProductnxn(const uint8_t *input,
                 const vec_t *inp = reinterpret_cast<const vec_t *>(&input[j]);
                 m512_add_dpbusd_epi32(prod, inp[0], w[j / 64]);
             }
-	    output[i] += _mm512_reduce_add_epi32(prod);
+            output[i] += _mm512_reduce_add_epi32(prod);
         }
         return;
     }
@@ -205,13 +239,13 @@ inline void dotProductnxn(const uint8_t *input,
     const vec_t ones = _mm_set1_epi16(1);
     for (unsigned i = 0; i < outputSize; i++) {
         const vec_t *row = reinterpret_cast<const vec_t *>(weights + i);
-        vec_t total  = _mm_setzero_si128();
-        for (unsigned j = 0; j < chunks<uint8_t,simdWidth>(inputSize)/2; ++j) {
-            vec_t p0 = _mm_madd_epi16(_mm_maddubs_epi16(inp[2*j+0], row[2*j+0]), ones);
-            vec_t p1 = _mm_madd_epi16(_mm_maddubs_epi16(inp[2*j+1], row[2*j+1]), ones);
+        vec_t total = _mm_setzero_si128();
+        for (unsigned j = 0; j < chunks<uint8_t, simdWidth>(inputSize) / 2; ++j) {
+            vec_t p0 = _mm_madd_epi16(_mm_maddubs_epi16(inp[2 * j + 0], row[2 * j + 0]), ones);
+            vec_t p1 = _mm_madd_epi16(_mm_maddubs_epi16(inp[2 * j + 1], row[2 * j + 1]), ones);
             vec_t sum = _mm_add_epi32(p0, p1);
             sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xb));
-            total = _mm_add_epi32(total,sum);
+            total = _mm_add_epi32(total, sum);
         }
 #ifdef SSE41
         output[i] = _mm_cvtsi128_si32(total) + _mm_extract_epi32(total, 1) + biases[i];
@@ -222,12 +256,12 @@ inline void dotProductnxn(const uint8_t *input,
     }
 #elif defined(SSE2)
     const vec_t zeros = _mm_setzero_si128();
-    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+    const vec_t *inp = reinterpret_cast<const vec_t *>(input);
     for (unsigned i = 0; i < outputSize; i++) {
         __m128i sum_lo = _mm_cvtsi32_si128(biases[i]);
         __m128i sum_hi = zeros;
-        const auto row = reinterpret_cast<const vec_t*>(&weights[i]);
-        for (unsigned j = 0; j < chunks<uint8_t,simdWidth>(inputSize); ++j) {
+        const auto row = reinterpret_cast<const vec_t *>(&weights[i]);
+        for (unsigned j = 0; j < chunks<uint8_t, simdWidth>(inputSize); ++j) {
             __m128i row_j = _mm_load_si128(&row[j]);
             __m128i input_j = _mm_load_si128(&inp[j]);
             __m128i row_signs = _mm_cmpgt_epi8(zeros, row_j);
@@ -252,11 +286,11 @@ inline void dotProductnxn(const uint8_t *input,
     for (unsigned i = 0; i < outputSize; ++i) {
         const int8x8_t *row = reinterpret_cast<const int8x8_t *>(weights[i]);
         int32x4_t accum = vmovq_n_s32(0);
-        for (unsigned j = 0; j < chunks<uint8_t,simdWidth/2>(inputSize); j+=2) {
+        for (unsigned j = 0; j < chunks<uint8_t, simdWidth / 2>(inputSize); j += 2) {
             // parallel multiply 64-bit chunks into product register
             vec_t prod = vmull_s8(inp[j], row[j]);
             // multiply and add next 64 bits
-            prod = vmlal_s8(prod, inp[j+1], row[j+1]);
+            prod = vmlal_s8(prod, inp[j + 1], row[j + 1]);
             // sum the products
             accum = vpadalq_s16(accum, prod);
         }
@@ -265,146 +299,311 @@ inline void dotProductnxn(const uint8_t *input,
 #endif
 }
 
-template <size_t size, typename DataType>
-inline void vec_copy(const DataType *in,DataType *out) {
+template <size_t size, typename DataType> inline void vec_copy(const DataType *in, DataType *out) {
     assert(in);
     assert(out);
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
-    for (size_t i = 0; i < chunks<DataType,simdWidth>(size); ++i) {
+    for (size_t i = 0; i < chunks<DataType, simdWidth>(size); ++i) {
 #ifdef AVX512
-        outp[i] = _mm512_load_si512(inp+i);
+        outp[i] = _mm512_load_si512(inp + i);
 #elif defined(AVX2)
-        outp[i] = _mm256_load_si256(inp+i);
+        outp[i] = _mm256_load_si256(inp + i);
 #elif defined(SSE2) || defined(SSSE3)
-        outp[i] = _mm_load_si128(inp+i);
+        outp[i] = _mm_load_si128(inp + i);
 #elif defined(NEON)
-        outp[i] = vld1q_s64(reinterpret_cast<const int64_t*>(inp + i));
+        outp[i] = vld1q_s64(reinterpret_cast<const int64_t *>(inp + i));
 #endif
     }
 }
 
-template <size_t size, typename InType, typename OutType>
-inline void vec_add(const InType *in, OutType *out) {
-    assert(sizeof(InType) == sizeof(OutType) && (sizeof(OutType)==2 || sizeof(OutType)==4));
+template <typename AccumType, typename WeightType, typename BiasType,
+          size_t inputSize /* features */, size_t outputSize /* accumulator size */>
+void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][outputSize],
+                const BiasType (*biases)[outputSize], const unsigned *indices) {
+    static_assert(sizeof(AccumType) == 2 || sizeof(AccumType) == 4, "unsupported accumulator type");
+    static_assert(sizeof(AccumType) == sizeof(WeightType),
+                  "AccumType different from WeightType not currently supported");
+    static_assert(sizeof(WeightType) == sizeof(BiasType),
+                  "BiasType different from WeightType not currently supported");
+    unsigned offset = 0;
 #ifdef NEON
-    const int16x8_t *inp = reinterpret_cast<const int16x8_t *>(in);
-    int16x8_t *outp = reinterpret_cast<int16x8_t *>(out);
-    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
-        outp[i] = vaddq_s16(outp[i], inp[i]);
+    unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
+    alignas(32) vec_t regs[simdRegCount];
+    if constexpr (sizeof(AccumType) == 2) {
+        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
+             remaining -= num_chunks, offset += num_chunks) {
+            // load biases into registers
+            if (biases) {
+                for (size_t i = 0; i < num_chunks; ++i) {
+                    regs[i] = vld1q_s16((*biases) + 8*(offset + i));
+                }
+            } else {
+                for (size_t i = 0; i < num_chunks; ++i) {
+                    regs[i] = vdupq_n_s16(0);
+                }
+            }
+            // perform updates in registers
+            for (size_t i = 0; indices[i] != 1000000; ++i) {
+                const auto w = (*weights)[indices[i]];
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vaddq_s16(regs[j], vld1q_s16(w + 8*(offset + j)));
+                }
+            }
+            // store results to memory
+            for (size_t i = 0; i < num_chunks; ++i) {
+                vst1q_s16(target + 8*(offset + i), regs[i]);
+            }
+        }
+    } else { // 32-bit
+        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
+             remaining -= num_chunks, offset += num_chunks) {
+            // load biases into registers
+            if (biases) {
+                for (size_t i = 0; i < num_chunks; ++i) {
+                    regs[i] = vld1q_s32((*biases) + 4*(offset + i));
+                }
+            } else {
+                for (size_t i = 0; i < num_chunks; ++i) {
+                    regs[i] = vdupq_n_s32(0);
+                }
+            }
+            // perform updates in registers
+            for (size_t i = 0; indices[i] != 1000000; ++i) {
+                const auto w = (*weights)[indices[i]];
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vaddq_s32(regs[j], vld1q_s32(w + 4*(offset + j)));
+                }
+            }
+            // store results to memory
+            for (size_t i = 0; i < num_chunks; ++i) {
+                vst1q_s32(target + 4*(offset + i), regs[i]);
+            }
+        }
     }
 #else
-    unsigned width = simdWidth;
-    size_t blocks;
-    while ((blocks = (8 * size * sizeof(OutType)) / width) == 0 && width > 128) {
-       // special case where we cannot use the widest SIMD instruction
-       width /= 2;
-    }
-    assert(blocks);
-    switch(width) {
-#ifdef AVX512
-    case 512: {
-      const vec_t *inp = reinterpret_cast<const vec_t *>(in);
-      vec_t *outp = reinterpret_cast<vec_t *>(out);
-      for (size_t i = 0; i < blocks; ++i) {
-	if constexpr (sizeof(OutType)==2)
-           outp[i] = _mm512_add_epi16(outp[i], inp[i]);
-	else
-           outp[i] = _mm512_add_epi32(outp[i], inp[i]);
-      }
-      break;
-    }
+#if defined(AVX512)
+    if constexpr (outputSize * sizeof(AccumType) * 8 < simdWidth) {
+        // special case, fall back to AVX2 because accum is not wide enough for AVX512
+        const __m256i *biasp = reinterpret_cast<const __m256i *>(biases);
+        __m256i *outp = reinterpret_cast<__m256i *>(target);
+        static_assert(outputSize * sizeof(AccumType) * 8 % 256 == 0,
+                      "expected width to be multiple of 256");
+        // how many simdWidth registers are needed to process accumulator
+        unsigned remaining = (outputSize * sizeof(AccumType) * 8) / 256;
+        static constexpr unsigned regCount = 16;
+        alignas(32) __m256i regs[regCount];
+        for (unsigned num_chunks = std::min<unsigned>(regCount, remaining); remaining > 0;
+             remaining -= num_chunks, offset += num_chunks) {
+            // load biases into registers
+            if (biasp) {
+                for (size_t i = 0; i < num_chunks; ++i) {
+                    regs[i] = _mm256_load_si256(biasp + offset + i);
+                }
+            } else {
+                for (size_t i = 0; i < num_chunks; ++i) {
+                    regs[i] = _mm256_setzero_si256();
+                }
+            }
+            // perform updates in registers
+            for (size_t i = 0; indices[i] != 1000000; ++i) {
+                const __m256i *w = reinterpret_cast<const __m256i *>((*weights)[indices[i]]);
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = _mm256_add_epi16(regs[j], _mm256_load_si256(w + offset + j));
+                }
+            }
+            // store results to memory
+            for (size_t i = 0; i < num_chunks; ++i) {
+                _mm256_store_si256(outp + offset + i, regs[i]);
+            }
+        }
+    } else
 #endif
-#ifdef AVX2
-    case 256: {
-      const __m256i *inp = reinterpret_cast<const __m256i *>(in);
-      __m256i *outp = reinterpret_cast<__m256i *>(out);
-      for (size_t i = 0; i < blocks; ++i) {
-	if constexpr (sizeof(OutType)==2)
-           outp[i] = _mm256_add_epi16(outp[i], inp[i]);
-	else
-           outp[i] = _mm256_add_epi32(outp[i], inp[i]);
-      }
-      break;
-    }
-#endif
-    case 128: {
-      const __m128i *inp = reinterpret_cast<const __m128i *>(in);
-      __m128i *outp = reinterpret_cast<__m128i *>(out);
-      for (size_t i = 0; i < blocks; ++i) {
-	if constexpr (sizeof(OutType)==2)
-           outp[i] = _mm_add_epi16(outp[i], inp[i]);
-	else
-           outp[i] = _mm_add_epi32(outp[i], inp[i]);
-      }
-      break;
-    }
-    default:
-      assert(0);
-      break;
+    {
+        static_assert(outputSize * sizeof(AccumType) * 8 >= simdWidth,
+                      "insufficient accumulator width");
+        static_assert(outputSize * sizeof(AccumType) * 8 % simdWidth == 0,
+                      "accumulator size is not multiple of SIMD width");
+        vec_t *outp = reinterpret_cast<vec_t *>(target);
+        const vec_t *biasp = reinterpret_cast<const vec_t *>(biases);
+        // how many simdWidth registers are needed to process accumulator
+        unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
+        alignas(32) vec_t regs[simdRegCount];
+        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
+             remaining -= num_chunks, offset += num_chunks) {
+            // load biases into registers
+            if (biasp) {
+                for (size_t i = 0; i < num_chunks; ++i) {
+                    regs[i] = vec_load(biasp + offset + i);
+                }
+            } else {
+                for (size_t i = 0; i < num_chunks; ++i) {
+                    regs[i] = zero;
+                }
+            }
+            // perform updates in registers
+            for (size_t i = 0; indices[i] != 1000000; ++i) {
+                const vec_t *w = reinterpret_cast<const vec_t *>((*weights)[indices[i]]);
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vec_add<sizeof(AccumType)>(regs[j], w + offset + j);
+                }
+            }
+            // store results to memory
+            for (size_t i = 0; i < num_chunks; ++i) {
+                vec_store(outp + offset + i, regs[i]);
+            }
+        }
     }
 #endif
 }
 
-template <size_t size, typename InType, typename OutType>
-inline void vec_sub(const InType *in, OutType *out) {
-
-    assert(sizeof(InType) == sizeof(OutType) && (sizeof(OutType)==2 || sizeof(OutType)==4));
+// Incremental update of 1/2 of the accumulator
+template <typename AccumType, typename WeightType, size_t inputSize /* features */,
+          size_t outputSize /* accumulator size*/>
+void update(const AccumType *source, AccumType *target,
+            const WeightType (&weights)[inputSize][outputSize], const unsigned *added,
+            size_t added_count, const unsigned *removed, size_t removed_count) {
+    // optimized sparse accumulator update, as detailed at
+    // https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md
+    // outputSize is the size of an accumulator half
+    static_assert(sizeof(AccumType) == 2 || sizeof(AccumType) == 4, "unsupported accumulator type");
+    static_assert(sizeof(AccumType) == sizeof(WeightType),
+                  "AccumType different from WeightType not currently supported");
+    unsigned offset = 0;
 #ifdef NEON
-    const int16x8_t *inp = reinterpret_cast<const int16x8_t *>(in);
-    int16x8_t *outp = reinterpret_cast<int16x8_t *>(out);
-    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
-        outp[i] = vsubq_s16(outp[i], inp[i]);
+    unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
+    alignas(32) vec_t regs[simdRegCount];
+    if constexpr (sizeof(AccumType) == 2) {
+        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
+             remaining -= num_chunks, offset += num_chunks) {
+            // load source into registers
+            for (size_t i = 0; i < num_chunks; ++i) {
+                regs[i] = vld1q_s16(source + 8*(offset + i));
+            }
+            // perform updates in registers
+            for (size_t i = 0; i < added_count; ++i) {
+                const auto *w = weights[added[i]];
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vaddq_s16(regs[j], vld1q_s16(w + 8*(offset + j)));
+                }
+            }
+            for (size_t i = 0; i < removed_count; ++i) {
+                const auto *w = weights[removed[i]];
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vsubq_s16(regs[j], vld1q_s16(w + 8*(offset + j)));
+                }
+            }
+            // store results to memory
+            for (size_t i = 0; i < num_chunks; ++i) {
+                vst1q_s16(target + 8*(offset + i), regs[i]);
+            }
+        }
+    } else { // 32-bit
+        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
+             remaining -= num_chunks, offset += num_chunks) {
+            // load source into registers
+            for (size_t i = 0; i < num_chunks; ++i) {
+                regs[i] = vld1q_s32(source + 4*(offset + i));
+            }
+            // perform updates in registers
+            for (size_t i = 0; i < added_count; ++i) {
+                const auto *w = weights[added[i]];
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vaddq_s32(regs[j], vld1q_s32(w + 4*(offset + j)));
+                }
+            }
+            for (size_t i = 0; i < removed_count; ++i) {
+                const auto *w = weights[removed[i]];
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vsubq_s32(regs[j], vld1q_s32(w + 4*(offset + j)));
+                }
+            }
+            // store results to memory
+            for (size_t i = 0; i < num_chunks; ++i) {
+                vst1q_s32(target + 4*(offset + i), regs[i]);
+            }
+        }
     }
 #else
-    size_t blocks;
-    unsigned width = simdWidth;
-    while ((blocks = (8 * size * sizeof(OutType)) / width) == 0 && width > 128) {
-       // special case where we cannot use the widest SIMD instruction
-       width /= 2;
-    }
-    assert(blocks);
-    switch(width) {
-#ifdef AVX512
-    case 512: {
-      const vec_t *inp = reinterpret_cast<const vec_t *>(in);
-      vec_t *outp = reinterpret_cast<vec_t *>(out);
-      for (size_t i = 0; i < blocks; ++i) {
-	if constexpr (sizeof(OutType)==2)
-           outp[i] = _mm512_sub_epi16(outp[i], inp[i]);
-	else
-           outp[i] = _mm512_sub_epi32(outp[i], inp[i]);
-      }
-      break;
-    }
+#if defined(AVX512)
+    if constexpr (outputSize * sizeof(AccumType) * 8 < simdWidth) {
+        static_assert(outputSize * sizeof(AccumType) * 8 % 256 == 0,
+                      "expected size to be multiple of 256");
+        // special case, fall back to AVX2 because accum is not wide enough for AVX512
+        const __m256i *inp = reinterpret_cast<const __m256i *>(source);
+        __m256i *outp = reinterpret_cast<__m256i *>(target);
+        static_assert(outputSize * sizeof(AccumType) * 8 % 256 == 0,
+                      "expected width to be multiple of 256");
+        // how many simdWidth registers are needed to process accumulator
+        unsigned remaining = (outputSize * sizeof(AccumType) * 8) / 256;
+        static constexpr unsigned regCount = 16;
+        alignas(32) __m256i regs[regCount];
+        for (unsigned num_chunks = std::min<unsigned>(regCount, remaining); remaining > 0;
+             remaining -= num_chunks, offset += num_chunks) {
+            // load source to registers
+            for (size_t i = 0; i < num_chunks; ++i) {
+                regs[i] = _mm256_load_si256(inp + offset + i);
+            }
+            // perform updates in registers
+            for (size_t i = 0; i < added_count; ++i) {
+                const __m256i *w = reinterpret_cast<const __m256i *>(&weights[added[i]]);
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    if constexpr (sizeof(AccumType) == 2)
+                        regs[j] = _mm256_add_epi16(regs[j], _mm256_load_si256(w + offset + j));
+                    else
+                        regs[j] = _mm256_add_epi32(regs[j], _mm256_load_si256(w + offset + j));
+                }
+            }
+            for (size_t i = 0; i < removed_count; ++i) {
+                const __m256i *w = reinterpret_cast<const __m256i *>(&weights[removed[i]]);
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    if constexpr (sizeof(AccumType) == 2)
+                        regs[j] = _mm256_sub_epi16(regs[j], _mm256_load_si256(w + offset + j));
+                    else
+                        regs[j] = _mm256_sub_epi32(regs[j], _mm256_load_si256(w + offset + j));
+                }
+            }
+            // store results to memory
+            for (size_t i = 0; i < num_chunks; ++i) {
+                _mm256_store_si256(outp + offset + i, regs[i]);
+            }
+        }
+    } else
 #endif
-#ifdef AVX2
-    case 256: {
-      const __m256i *inp = reinterpret_cast<const __m256i *>(in);
-      __m256i *outp = reinterpret_cast<__m256i *>(out);
-      for (size_t i = 0; i < blocks; ++i) {
-	if constexpr (sizeof(OutType)==2)
-           outp[i] = _mm256_sub_epi16(outp[i], inp[i]);
-	else
-           outp[i] = _mm256_sub_epi32(outp[i], inp[i]);
-      }
-      break;
-    }
-#endif
-    case 128: {
-      const __m128i *inp = reinterpret_cast<const __m128i *>(in);
-      __m128i *outp = reinterpret_cast<__m128i *>(out);
-      for (size_t i = 0; i < blocks; ++i) {
-	if constexpr (sizeof(OutType)==2)
-           outp[i] = _mm_sub_epi16(outp[i], inp[i]);
-	else
-           outp[i] = _mm_sub_epi32(outp[i], inp[i]);
-      }
-      break;
-    }
-    default:
-      assert(0);
-      break;
+    {
+        static_assert(outputSize * sizeof(AccumType) * 8 >= simdWidth,
+                      "insufficient accumulator width");
+        static_assert(outputSize * sizeof(AccumType) * 8 % simdWidth == 0,
+                      "accumulator size is not multiple of SIMD width");
+        const vec_t *inp = reinterpret_cast<const vec_t *>(source);
+        vec_t *outp = reinterpret_cast<vec_t *>(target);
+        // how many simdWidth registers are needed to process accumulator
+        unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
+        alignas(32) vec_t regs[simdRegCount];
+        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
+             remaining -= num_chunks, offset += num_chunks) {
+            // load source to registers
+            for (size_t i = 0; i < num_chunks; ++i) {
+                regs[i] = vec_load(inp + offset + i);
+            }
+            // perform updates in registers
+            for (size_t i = 0; i < added_count; ++i) {
+                const vec_t *w = reinterpret_cast<const vec_t *>(&weights[added[i]]);
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vec_add<sizeof(AccumType)>(regs[j], w + offset + j);
+                }
+            }
+            for (size_t i = 0; i < removed_count; ++i) {
+                const vec_t *w = reinterpret_cast<const vec_t *>(&weights[removed[i]]);
+                for (size_t j = 0; j < num_chunks; ++j) {
+                    regs[j] = vec_sub<sizeof(AccumType)>(regs[j], w + offset + j);
+                }
+            }
+            // store results to memory
+            for (size_t i = 0; i < num_chunks; ++i) {
+                vec_store(outp + offset + i, regs[i]);
+            }
+        }
     }
 #endif
 }
@@ -417,99 +616,101 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
     const int8x16_t packedZeros = vdupq_n_s8(0);
     const int8x16_t packedMax = vdupq_n_s16(clampMax);
     size_t j = 0;
-    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i, j += 2) {
+    for (size_t i = 0; i < chunks<OutType, simdWidth>(size); ++i, j += 2) {
         vec_t words0 = vld1q_s16(in + 8 * (j + 0));
         vec_t words1 = vld1q_s16(in + 8 * (j + 1));
-	vec_t out0 = vminq_s16(vmaxq_s16(words0, packedZeros), packedMax);
-	vec_t out1 = vminq_s16(vmaxq_s16(words1, packedZeros), packedMax);
+        vec_t out0 = vminq_s16(vmaxq_s16(words0, packedZeros), packedMax);
+        vec_t out1 = vminq_s16(vmaxq_s16(words1, packedZeros), packedMax);
         outp[i] = vcombine_s8(vmovn_s16(out0), vmovn_s16(out1));
     }
 #elif defined(AVX2)
-    assert(sizeof(InType)==2);
-    assert(sizeof(OutType)==1);
+    assert(sizeof(InType) == 2);
+    assert(sizeof(OutType) == 1);
     const __m256i *inp = reinterpret_cast<const __m256i *>(in);
     __m256i *outp = reinterpret_cast<__m256i *>(out);
-    for (size_t i = 0; i < chunks<OutType,256>(size); ++i) {
+    for (size_t i = 0; i < chunks<OutType, 256>(size); ++i) {
         // load 2x256 bit registers of input data
-        __m256i words0 = _mm256_load_si256(
-            reinterpret_cast<const __m256i *>(inp + 2 * i + 0));
-        __m256i words1 = _mm256_load_si256(
-            reinterpret_cast<const __m256i *>(inp + 2 * i + 1));
+        __m256i words0 = _mm256_load_si256(reinterpret_cast<const __m256i *>(inp + 2 * i + 0));
+        __m256i words1 = _mm256_load_si256(reinterpret_cast<const __m256i *>(inp + 2 * i + 1));
         // clamp and store into one 256-bit output chunk
         _mm256_store_si256(
             &outp[i],
-            _mm256_permute4x64_epi64(
-                _mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero256),
-                0b11011000));
+            _mm256_permute4x64_epi64(_mm256_max_epi8(_mm256_packs_epi16(words0, words1), zero256),
+                                     0b11011000));
     }
 #elif defined(SSE2) || defined(SSSE3)
     const vec_t *inp = reinterpret_cast<const vec_t *>(in);
     vec_t *outp = reinterpret_cast<vec_t *>(out);
     __m128i packedZeros = _mm_setzero_si128();
     __m128i packedMax = _mm_set1_epi16(clampMax);
-    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i) {
+    for (size_t i = 0; i < chunks<OutType, simdWidth>(size); ++i) {
         __m128i out0, out1;
-        __m128i words0 = _mm_load_si128(
-            reinterpret_cast<const __m128i *>(inp + 2 * i + 0));
-        __m128i words1 = _mm_load_si128(
-            reinterpret_cast<const __m128i *>(inp + 2 * i + 1));
+        __m128i words0 = _mm_load_si128(reinterpret_cast<const __m128i *>(inp + 2 * i + 0));
+        __m128i words1 = _mm_load_si128(reinterpret_cast<const __m128i *>(inp + 2 * i + 1));
         out0 = _mm_min_epi16(_mm_max_epi16(words0, packedZeros), packedMax);
         out1 = _mm_min_epi16(_mm_max_epi16(words1, packedZeros), packedMax);
-        outp[i] = _mm_packs_epi16(out0,out1);
+        outp[i] = _mm_packs_epi16(out0, out1);
     }
 #endif
 }
 
 template <typename InType, typename OutType, size_t size, unsigned rshift>
 inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampMax) {
-    static_assert(sizeof(InType)==4 && sizeof(OutType)==1,"conditions not met for scale_and_clamp SIMD implementation");
+    static_assert(sizeof(InType) == 4 && sizeof(OutType) == 1,
+                  "conditions not met for scale_and_clamp SIMD implementation");
 #ifdef NEON
     vec_t *outp = reinterpret_cast<vec_t *>(out);
     const int8x16_t packedZeros = vdupq_n_s8(0);
     const int8x16_t packedMax = vdupq_n_s16(clampMax);
     size_t j = 0;
-    static_assert(size*8 >= simdWidth && size*8 % simdWidth == 0,"conditions not met for scale_and_clamp SIMD implementation");
-    for (size_t i = 0; i < chunks<OutType,simdWidth>(size); ++i, j += 4) {
+    static_assert(size * 8 >= simdWidth && size * 8 % simdWidth == 0,
+                  "conditions not met for scale_and_clamp SIMD implementation");
+    for (size_t i = 0; i < chunks<OutType, simdWidth>(size); ++i, j += 4) {
         int32x4_t r0 = vld1q_s32(in + 4 * (j + 0));
         int32x4_t r1 = vld1q_s32(in + 4 * (j + 1));
         int32x4_t r2 = vld1q_s32(in + 4 * (j + 2));
         int32x4_t r3 = vld1q_s32(in + 4 * (j + 3));
         // shift and narrow
-        int8x16_t words0 = vcombine_s16(vshrn_n_s32(r0,rshift),vshrn_n_s32(r1,rshift));
-        int8x16_t words1 = vcombine_s16(vshrn_n_s32(r2,rshift),vshrn_n_s32(r3,rshift));
+        int8x16_t words0 = vcombine_s16(vshrn_n_s32(r0, rshift), vshrn_n_s32(r1, rshift));
+        int8x16_t words1 = vcombine_s16(vshrn_n_s32(r2, rshift), vshrn_n_s32(r3, rshift));
         // do min/max
-	vec_t out0 = vminq_s16(vmaxq_s16(words0, packedZeros), packedMax);
-	vec_t out1 = vminq_s16(vmaxq_s16(words1, packedZeros), packedMax);
+        vec_t out0 = vminq_s16(vmaxq_s16(words0, packedZeros), packedMax);
+        vec_t out1 = vminq_s16(vmaxq_s16(words1, packedZeros), packedMax);
         // pack into output
         outp[i] = vcombine_s8(vmovn_s16(out0), vmovn_s16(out1));
     }
 #else
 #if defined(AVX2)
-    if constexpr (size*8 >= 256) {
+    if constexpr (size * 8 >= 256) {
         const __m256i *inp = reinterpret_cast<const __m256i *>(in);
         __m256i *outp = reinterpret_cast<__m256i *>(out);
-        static_assert(size*8 % 256 == 0,"conditions not met for scale_and_clamp SIMD implementation");
+        static_assert(size * 8 % 256 == 0,
+                      "conditions not met for scale_and_clamp SIMD implementation");
         const __m256i control = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
-        for (size_t i = 0; i < chunks<OutType,256>(size); ++i) {
+        for (size_t i = 0; i < chunks<OutType, 256>(size); ++i) {
             // load 2x256 bit registers of shifted input data (32 bit input, 16 bit output)
-            const __m256i r1  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
-            const __m256i r2  = _mm256_srai_epi16(_mm256_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
+            const __m256i r1 =
+                _mm256_srai_epi16(_mm256_packs_epi32(inp[4 * i + 0], inp[4 * i + 1]), rshift);
+            const __m256i r2 =
+                _mm256_srai_epi16(_mm256_packs_epi32(inp[4 * i + 2], inp[4 * i + 3]), rshift);
             // clamp and store into one 256-bit output chunk
-            outp[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero256), control);
+            outp[i] = _mm256_permutevar8x32_epi32(
+                _mm256_max_epi8(_mm256_packs_epi16(r1, r2), zero256), control);
         }
         return;
-    }
-    else
+    } else
 #endif
 #if defined(AVX2) || defined(SSE2) || defined(SSSE3)
     {
         const __m128i *inp = reinterpret_cast<const __m128i *>(in);
         __m128i *outp = reinterpret_cast<__m128i *>(out);
-        static_assert(size*8 % 128 == 0,"conditions not met for scale_and_clamp SIMD implementation");
-        for (size_t i = 0; i < chunks<OutType,128>(size); ++i) {
-            // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and clamp
-            __m128i r1  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 0],inp[4*i + 1]), rshift);
-            __m128i r2  = _mm_srai_epi16(_mm_packs_epi32(inp[4*i + 2],inp[4*i + 3]), rshift);
+        static_assert(size * 8 % 128 == 0,
+                      "conditions not met for scale_and_clamp SIMD implementation");
+        for (size_t i = 0; i < chunks<OutType, 128>(size); ++i) {
+            // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and
+            // clamp
+            __m128i r1 = _mm_srai_epi16(_mm_packs_epi32(inp[4 * i + 0], inp[4 * i + 1]), rshift);
+            __m128i r2 = _mm_srai_epi16(_mm_packs_epi32(inp[4 * i + 2], inp[4 * i + 3]), rshift);
             // pack into 8-bit output and clamp
 #ifdef SSE41
             outp[i] = _mm_max_epi8(_mm_packs_epi16(r1, r2), _mm_setzero_si128());
@@ -523,66 +724,68 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
 #endif
 }
 
-// implements the 2nd layer of the SFv4 net, transforming the output of one half of the accumulator
-// into a uint8_t vector
+// implements the second layer of the SFv4 net, transforming the output of one half of the
+// accumulator into a uint8_t vector
 template <typename InType, typename OutType, size_t size, unsigned clampMax, unsigned shift>
 static inline void multAndSum(const InType *input, OutType *output) {
     // currently assume fixed size types
-    static_assert(sizeof(InType)==2 && sizeof(OutType)==1);
-    static_assert(size*8 >= simdWidth && size*8 % simdWidth == 0);
+    static_assert(sizeof(InType) == 2 && sizeof(OutType) == 1);
+    static_assert(size * 8 >= simdWidth && size * 8 % simdWidth == 0);
 
 #ifdef NEON
     vec_t *outp = reinterpret_cast<vec_t *>(output);
     const int8x16_t packedZeros = vdupq_n_s16(0);
     const int8x16_t packedMax = vdupq_n_s16(clampMax);
-    const int16x8_t* inp0 = reinterpret_cast<const int16x8_t* >(input);
-    const int16x8_t* inp1 = reinterpret_cast<const int16x8_t* >(input + size);
+    const int16x8_t *inp0 = reinterpret_cast<const int16x8_t *>(input);
+    const int16x8_t *inp1 = reinterpret_cast<const int16x8_t *>(input + size);
     size_t j = 0;
-    for (size_t i = 0; i < chunks<InType,simdWidth>(size/2); ++i, j += 2) {
+    for (size_t i = 0; i < chunks<InType, simdWidth>(size / 2); ++i, j += 2) {
         // load + do min/max
-        const int16x8_t sum0a = vminq_s16(vmaxq_s16(inp0[j + 0],packedZeros), packedMax);
-        const int16x8_t sum0b = vminq_s16(vmaxq_s16(inp0[j + 1],packedZeros), packedMax);
-        const int16x8_t sum1a = vminq_s16(vmaxq_s16(inp1[j + 0],packedZeros), packedMax);
-        const int16x8_t sum1b = vminq_s16(vmaxq_s16(inp1[j + 1],packedZeros), packedMax);
+        const int16x8_t sum0a = vminq_s16(vmaxq_s16(inp0[j + 0], packedZeros), packedMax);
+        const int16x8_t sum0b = vminq_s16(vmaxq_s16(inp0[j + 1], packedZeros), packedMax);
+        const int16x8_t sum1a = vminq_s16(vmaxq_s16(inp1[j + 0], packedZeros), packedMax);
+        const int16x8_t sum1b = vminq_s16(vmaxq_s16(inp1[j + 1], packedZeros), packedMax);
         // multiply
-        const vec_t prod0 = vmulq_s16(sum0a,sum1a);
-        const vec_t prod1 = vmulq_s16(sum0b,sum1b);
+        const vec_t prod0 = vmulq_s16(sum0a, sum1a);
+        const vec_t prod1 = vmulq_s16(sum0b, sum1b);
         // shift + narrow, pack into output register
-        outp[i] = vcombine_s8(vshrn_n_s16(prod0,shift),vshrn_n_s16(prod1,shift));
+        outp[i] = vcombine_s8(vshrn_n_s16(prod0, shift), vshrn_n_s16(prod1, shift));
     }
 #else
     const vec_t limit = vec_set_16(clampMax);
-    const vec_t* inp0 = reinterpret_cast<const vec_t*>(input);
-    const vec_t* inp1 = reinterpret_cast<const vec_t*>(input + size);
-    vec_t* outp = reinterpret_cast<vec_t*>(output);
+    const vec_t *inp0 = reinterpret_cast<const vec_t *>(input);
+    const vec_t *inp1 = reinterpret_cast<const vec_t *>(input + size);
+    vec_t *outp = reinterpret_cast<vec_t *>(output);
 
-    for (size_t i = 0; i < chunks<InType,simdWidth>(size/2); ++i) {
+    for (size_t i = 0; i < chunks<InType, simdWidth>(size / 2); ++i) {
 #ifdef AVX512
-        const vec_t sum0a = _mm512_max_epi16(_mm512_min_epi16(inp0[i*2],limit),zero);
-        const vec_t sum0b = _mm512_max_epi16(_mm512_min_epi16(inp0[i*2+1],limit),zero);
-        const vec_t sum1a = _mm512_max_epi16(_mm512_min_epi16(inp1[i*2],limit),zero);
-        const vec_t sum1b = _mm512_max_epi16(_mm512_min_epi16(inp1[i*2+1],limit),zero);
-        const vec_t prod0 = _mm512_mullo_epi16(sum0a,sum1a);
-        const vec_t prod1 = _mm512_mullo_epi16(sum0b,sum1b);
-        vec_t compacted = _mm512_packs_epi16(_mm512_srli_epi16(prod0,7),_mm512_srli_epi16(prod1,shift));
+        const vec_t sum0a = _mm512_max_epi16(_mm512_min_epi16(inp0[i * 2], limit), zero);
+        const vec_t sum0b = _mm512_max_epi16(_mm512_min_epi16(inp0[i * 2 + 1], limit), zero);
+        const vec_t sum1a = _mm512_max_epi16(_mm512_min_epi16(inp1[i * 2], limit), zero);
+        const vec_t sum1b = _mm512_max_epi16(_mm512_min_epi16(inp1[i * 2 + 1], limit), zero);
+        const vec_t prod0 = _mm512_mullo_epi16(sum0a, sum1a);
+        const vec_t prod1 = _mm512_mullo_epi16(sum0b, sum1b);
+        vec_t compacted =
+            _mm512_packs_epi16(_mm512_srli_epi16(prod0, 7), _mm512_srli_epi16(prod1, shift));
         outp[i] = _mm512_permutexvar_epi64(_mm512_setr_epi64(0, 2, 4, 6, 1, 3, 5, 7), compacted);
 #elif defined(AVX2)
-        const vec_t sum0a = _mm256_max_epi16(_mm256_min_epi16(inp0[i*2],limit),zero);
-        const vec_t sum0b = _mm256_max_epi16(_mm256_min_epi16(inp0[i*2+1],limit),zero);
-        const vec_t sum1a = _mm256_max_epi16(_mm256_min_epi16(inp1[i*2],limit),zero);
-        const vec_t sum1b = _mm256_max_epi16(_mm256_min_epi16(inp1[i*2+1],limit),zero);
-        const vec_t prod0 = _mm256_mullo_epi16(sum0a,sum1a);
-        const vec_t prod1 = _mm256_mullo_epi16(sum0b,sum1b);
-        vec_t compacted = _mm256_packs_epi16(_mm256_srli_epi16(prod0,shift), _mm256_srli_epi16(prod1,shift));
+        const vec_t sum0a = _mm256_max_epi16(_mm256_min_epi16(inp0[i * 2], limit), zero);
+        const vec_t sum0b = _mm256_max_epi16(_mm256_min_epi16(inp0[i * 2 + 1], limit), zero);
+        const vec_t sum1a = _mm256_max_epi16(_mm256_min_epi16(inp1[i * 2], limit), zero);
+        const vec_t sum1b = _mm256_max_epi16(_mm256_min_epi16(inp1[i * 2 + 1], limit), zero);
+        const vec_t prod0 = _mm256_mullo_epi16(sum0a, sum1a);
+        const vec_t prod1 = _mm256_mullo_epi16(sum0b, sum1b);
+        vec_t compacted =
+            _mm256_packs_epi16(_mm256_srli_epi16(prod0, shift), _mm256_srli_epi16(prod1, shift));
         outp[i] = _mm256_permute4x64_epi64(compacted, 0b11011000);
 #elif defined(SSE2)
-        const vec_t sum0a = _mm_max_epi16(_mm_min_epi16(inp0[i*2],limit),zero);
-        const vec_t sum0b = _mm_max_epi16(_mm_min_epi16(inp0[i*2+1],limit),zero);
-        const vec_t sum1a = _mm_max_epi16(_mm_min_epi16(inp1[i*2],limit),zero);
-        const vec_t sum1b = _mm_max_epi16(_mm_min_epi16(inp1[i*2+1],limit),zero);
-        const vec_t prod0 = _mm_mullo_epi16(sum0a,sum1a);
-        const vec_t prod1 = _mm_mullo_epi16(sum0b,sum1b);
-        outp[i] = _mm_packs_epi16(_mm_srli_epi16(prod0,shift),_mm_srli_epi16(prod1,shift));
+        const vec_t sum0a = _mm_max_epi16(_mm_min_epi16(inp0[i * 2], limit), zero);
+        const vec_t sum0b = _mm_max_epi16(_mm_min_epi16(inp0[i * 2 + 1], limit), zero);
+        const vec_t sum1a = _mm_max_epi16(_mm_min_epi16(inp1[i * 2], limit), zero);
+        const vec_t sum1b = _mm_max_epi16(_mm_min_epi16(inp1[i * 2 + 1], limit), zero);
+        const vec_t prod0 = _mm_mullo_epi16(sum0a, sum1a);
+        const vec_t prod1 = _mm_mullo_epi16(sum0b, sum1b);
+        outp[i] = _mm_packs_epi16(_mm_srli_epi16(prod0, shift), _mm_srli_epi16(prod1, shift));
 #endif
     }
 #endif
@@ -591,4 +794,3 @@ static inline void multAndSum(const InType *input, OutType *output) {
 } // namespace simd
 
 #endif
-

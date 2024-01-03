@@ -64,16 +64,14 @@ public:
         size_t added_count, removed_count;
         getIndexDiffs(ciSource, ciTarget, c, added, removed, added_count,
                       removed_count);
-        // copy from source to target
         AccumulatorHalf sourceHalf =
             Network::AccumulatorType::getHalf(c, ciSource.sideToMove());
         AccumulatorHalf targetHalf =
             Network::AccumulatorType::getHalf(c, ciTarget.sideToMove());
-        ciTarget.getAccumulator().copy_half(
-                                            targetHalf, ciSource.getAccumulator(), sourceHalf);
         // update based on diffs
-        network.updateAccum(added, removed, added_count, removed_count,
-                                     targetHalf, ciTarget.getAccumulator());
+        network.updateAccum(ciSource.getAccumulator(), sourceHalf,
+                            ciTarget.getAccumulator(), targetHalf,
+                            added, added_count, removed, removed_count);
         ciTarget.getAccumulator().setState(targetHalf,
                                            AccumulatorState::Computed);
     }

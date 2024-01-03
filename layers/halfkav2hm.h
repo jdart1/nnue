@@ -1,4 +1,4 @@
-// Copyright 2020-2022 by Jon Dart. All Rights Reserved.
+// Copyright 2020-2023 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_HALF_KA_V2_HM_H
 #define _NNUE_HALF_KA_V2_HM_H
 
@@ -33,13 +33,34 @@ public:
         return idx;
     }
 
-    // Propagate data through the layer, updating the specified half of the
+    // Full update: propagate data through the layer, updating the specified half of the
     // accumulator (side to move goes in lower half).
     void updateAccum(const IndexArray &indices, AccumulatorHalf half, AccumulatorType &output) const noexcept {
+#ifdef SIMD
+        simd::fullUpdate<OutputType,WeightType,BiasType,inputSize,outputSize>(output.data(half), &_weights, &_biases, indices.data());
+        simd::fullUpdate<PSQWeightType,PSQWeightType,PSQWeightType,inputSize,PSQBuckets>(output.PSQData(half), &_psq, nullptr, indices.data());
+#else
         output.init_half(half,this->_biases);
         for (auto it = indices.begin(); it != indices.end() && *it != LAST_INDEX; ++it) {
             output.add_half(half,this->_weights[*it],this->_psq[*it]);
         }
+#endif
+    }
+
+    // Perform an incremental update
+    void updateAccum(const AccumulatorType &source, AccumulatorHalf sourceHalf,
+                     AccumulatorType &target, AccumulatorHalf targetHalf,
+                     const IndexArray &added, size_t added_count, const IndexArray &removed,
+                     size_t removed_count) const noexcept {
+#ifdef SIMD
+        simd::update<OutputType,WeightType,inputSize,outputSize>(source.getOutput(sourceHalf),target.data(targetHalf),_weights,
+                                                                 added.data(), added_count, removed.data(), removed_count);
+        simd::update<PSQWeightType,PSQWeightType,inputSize,PSQBuckets>(source.getPSQ(sourceHalf),target.PSQData(targetHalf),_psq,
+                                                                 added.data(), added_count, removed.data(), removed_count);
+#else
+        target.copy_half(targetHalf,source,sourceHalf);
+        updateAccum(added,removed,added_count,removed_count,targetHalf,target);
+#endif
     }
 
     // Perform an incremental update
@@ -53,7 +74,7 @@ public:
             output.sub_half(half, this->_weights[removed[i]], this->_psq[removed[i]]);
         }
     }
-    
+
     virtual inline void doForward(const InputType *, OutputType *) const noexcept {
         // no-op for this layer: use updateAccum
         assert(0);

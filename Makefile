@@ -4,9 +4,11 @@
 # typical build flags for different architectures, select one
 ARCH_FLAGS := -DSIMD -DSSE2 -DAVX2 -DUSE_POPCNT -DSSSE3 -DSSE41 -mavx2 -mbmi2 -msse4.1 -msse4.2 -mpopcnt
 #ARCH_FLAGS = -mavx2 -mbmi2 -msse2 -DSIMD -DAVX2 -DAVX512 -mavx512bw
-#ARCH_FLAGS = -DSIMD -DNEON -mcpu=apple-m1
+#ARCH_FLAGS = -DSIMD -DNEON -mcpu=apple-m1 -m64
+#ARCH_FLAGS = -DSIMD -DNEON  -m64 -mmacosx-version-min=10.14 -arch arm64 -march=armv8.2-a+dotprod 
+#ARCH_FLAGS = -DSIMD -DSSE2 -msse4.1 -msse4.2 -mpopcnt
 
-OPT := -O3
+#OPT := -O3
 NNUE_FLAGS = -I. -std=c++17 -Wall -Wextra -Wpedantic -Wshadow
 
 NN_LIBS := -lstdc++ -lc -lm
@@ -19,6 +21,7 @@ LD = $(CXX)
 
 #LDFLAGS = -fuse-ld=gold
 #LDFLAGS =  -fsanitize=address -fsanitize=bounds-strict
+#DEBUG = -ggdb
 
 BUILD = build
 EXPORT = build

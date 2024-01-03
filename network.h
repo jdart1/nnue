@@ -118,10 +118,11 @@ public:
     friend std::istream &operator>>(std::istream &i, Network &);
 
     // Perform an incremental update
-    void updateAccum(const IndexArray &added, const IndexArray &removed,
-                     size_t added_count, size_t removed_count,
-                     AccumulatorHalf half, AccumulatorType &output) const noexcept {
-        transformer->updateAccum(added, removed, added_count, removed_count, half, output);
+    void updateAccum(const AccumulatorType &source, AccumulatorHalf sourceHalf,
+                     AccumulatorType &target, AccumulatorHalf targetHalf, 
+                     const IndexArray &added, size_t added_count, const IndexArray &removed,
+                     size_t removed_count) const noexcept {
+        transformer->updateAccum(source, sourceHalf, target, targetHalf, added, added_count, removed, removed_count);
     }
 
     // Propagate data through the layer, updating the specified half of the
