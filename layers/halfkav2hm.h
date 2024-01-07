@@ -1,4 +1,4 @@
-// Copyright 2020-2023 by Jon Dart. All Rights Reserved.
+// Copyright 2020-2024 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_HALF_KA_V2_HM_H
 #define _NNUE_HALF_KA_V2_HM_H
 
@@ -108,6 +108,10 @@ public:
         for (size_t i = 0; i < outputSize; ++i) {
            _weights[row][i] = col[i];
         }
+    }
+
+    virtual void setBiases(const BiasType *b) {
+        std::memcpy(_biases,reinterpret_cast<const void*>(b),sizeof(BiasType)*outputSize);
     }
 
     virtual void setPSQ(size_t row, const PSQWeightType *col) {

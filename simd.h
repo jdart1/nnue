@@ -14,6 +14,7 @@ namespace simd {
 
 #ifdef AVX512
 using vec_t = __m512i;
+static constexpr size_t VEC_ALIGN = 64;
 static constexpr size_t simdWidth = 512;
 static constexpr size_t simdRegCount = 32;
 static const vec_t ones512 = _mm512_set1_epi16(1);
@@ -29,6 +30,7 @@ static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm512_sub_epi16
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm512_sub_epi32(x, vec_load(y)); }
 #elif defined(AVX2)
 using vec_t = __m256i;
+static constexpr size_t VEC_ALIGN = 32;
 static constexpr size_t simdWidth = 256;
 static constexpr size_t simdRegCount = 16;
 static const vec_t ones256 = _mm256_set1_epi16(1);
@@ -43,6 +45,7 @@ static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm256_sub_epi16
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm256_sub_epi32(x, vec_load(y)); }
 #elif defined(SSE2) || defined(SSSE3)
 using vec_t = __m128i;
+static constexpr size_t VEC_ALIGN = 32;
 static constexpr size_t simdWidth = 128;
 static constexpr size_t simdRegCount = 16;
 static const vec_t ones128 = _mm_set1_epi16(1);
@@ -56,6 +59,7 @@ static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm_sub_epi16(x,
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm_sub_epi32(x, vec_load(y)); }
 #elif defined(NEON)
 using vec_t = int16x8_t;
+static constexpr size_t VEC_ALIGN = 32;
 static constexpr size_t simdWidth = 128;
 static constexpr size_t simdRegCount = 16;
 static const vec_t ones128 = vdupq_n_s16(1);
@@ -329,7 +333,7 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
     unsigned offset = 0;
 #ifdef NEON
     unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
-    alignas(32) vec_t regs[simdRegCount];
+    alignas(VEC_ALIGN) vec_t regs[simdRegCount];
     if constexpr (sizeof(AccumType) == 2) {
         for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
              remaining -= num_chunks, offset += num_chunks) {
@@ -385,18 +389,18 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
 #if defined(AVX512)
     if constexpr (outputSize * sizeof(AccumType) * 8 < simdWidth) {
         // special case, fall back to AVX2 because accum is not wide enough for AVX512
-        const __m256i *biasp = reinterpret_cast<const __m256i *>(biases);
         __m256i *outp = reinterpret_cast<__m256i *>(target);
         static_assert(outputSize * sizeof(AccumType) * 8 % 256 == 0,
                       "expected width to be multiple of 256");
         // how many simdWidth registers are needed to process accumulator
         unsigned remaining = (outputSize * sizeof(AccumType) * 8) / 256;
         static constexpr unsigned regCount = 16;
-        alignas(32) __m256i regs[regCount];
+        alignas(VEC_ALIGN) __m256i regs[regCount];
         for (unsigned num_chunks = std::min<unsigned>(regCount, remaining); remaining > 0;
              remaining -= num_chunks, offset += num_chunks) {
             // load biases into registers
-            if (biasp) {
+            if (biases) {
+                const __m256i *biasp = reinterpret_cast<const __m256i *>(*biases);
                 for (size_t i = 0; i < num_chunks; ++i) {
                     regs[i] = _mm256_load_si256(biasp + offset + i);
                 }
@@ -420,21 +424,22 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
     } else
 #endif
     {
+        // generic x86 code, for AVX2 or SSE2
         static_assert(outputSize * sizeof(AccumType) * 8 >= simdWidth,
                       "insufficient accumulator width");
         static_assert(outputSize * sizeof(AccumType) * 8 % simdWidth == 0,
                       "accumulator size is not multiple of SIMD width");
         vec_t *outp = reinterpret_cast<vec_t *>(target);
-        const vec_t *biasp = reinterpret_cast<const vec_t *>(biases);
         // how many simdWidth registers are needed to process accumulator
         unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
-        alignas(32) vec_t regs[simdRegCount];
+        alignas(VEC_ALIGN) vec_t regs[simdRegCount];
         for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
              remaining -= num_chunks, offset += num_chunks) {
             // load biases into registers
-            if (biasp) {
+            if (biases) {
+                const vec_t *biasp = reinterpret_cast<const vec_t *>(*biases);
                 for (size_t i = 0; i < num_chunks; ++i) {
-                    regs[i] = vec_load(biasp + offset + i);
+                    regs[i] = biasp[offset + i];
                 }
             } else {
                 for (size_t i = 0; i < num_chunks; ++i) {
@@ -472,7 +477,7 @@ void update(const AccumType *source, AccumType *target,
     unsigned offset = 0;
 #ifdef NEON
     unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
-    alignas(32) vec_t regs[simdRegCount];
+    alignas(VEC_ALIGN) vec_t regs[simdRegCount];
     if constexpr (sizeof(AccumType) == 2) {
         for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
              remaining -= num_chunks, offset += num_chunks) {
@@ -537,7 +542,7 @@ void update(const AccumType *source, AccumType *target,
         // how many simdWidth registers are needed to process accumulator
         unsigned remaining = (outputSize * sizeof(AccumType) * 8) / 256;
         static constexpr unsigned regCount = 16;
-        alignas(32) __m256i regs[regCount];
+        alignas(VEC_ALIGN) __m256i regs[regCount];
         for (unsigned num_chunks = std::min<unsigned>(regCount, remaining); remaining > 0;
              remaining -= num_chunks, offset += num_chunks) {
             // load source to registers
@@ -579,7 +584,7 @@ void update(const AccumType *source, AccumType *target,
         vec_t *outp = reinterpret_cast<vec_t *>(target);
         // how many simdWidth registers are needed to process accumulator
         unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
-        alignas(32) vec_t regs[simdRegCount];
+        alignas(VEC_ALIGN) vec_t regs[simdRegCount];
         for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
              remaining -= num_chunks, offset += num_chunks) {
             // load source to registers
