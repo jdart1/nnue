@@ -25,10 +25,13 @@ static int test_linear() {
     using BiasType = int32_t;
     using OutputType = int32_t;
 
-    static BiasType biases[COLS];
-    static WeightType weights[COLS][ROWS]; // indexed first by output
+    // serializer assumes rows are at least 32 bytes
+    static constexpr size_t ROUNDED_ROWS = std::max<size_t>(ROWS, 32);
 
-    constexpr size_t bufSize = COLS*sizeof(BiasType)+ (ROWS * COLS)*sizeof(WeightType);
+    static BiasType biases[COLS];
+    static WeightType weights[COLS][ROUNDED_ROWS]; // indexed first by output
+
+    constexpr size_t bufSize = COLS*sizeof(BiasType) + (ROUNDED_ROWS * COLS)*sizeof(WeightType);
     auto buf = std::unique_ptr<std::byte[]>(new std::byte[bufSize]);
 
     std::byte *b = buf.get();
@@ -40,7 +43,7 @@ static int test_linear() {
     WeightType *w = reinterpret_cast<WeightType*>(b);
     // serialized in column order
     for (size_t i = 0; i < COLS; i++) {
-        for (size_t j = 0; j < ROWS; j++) {
+        for (size_t j = 0; j < ROUNDED_ROWS; j++) {
             *w++ = weights[i][j] = ((i+j) % 20) - 10;
         }
     }
@@ -54,8 +57,7 @@ static int test_linear() {
 #endif
 
     std::ofstream outfile(tmp_name, std::ios::binary | std::ios::trunc);
-    outfile.write(reinterpret_cast<char *>(buf.get()),
-                  bufSize);
+    outfile.write(reinterpret_cast<char *>(buf.get()), bufSize);
     if (outfile.bad()) {
       ++errs;
       std::cerr << "error writing stream" << std::endl;
@@ -603,6 +605,7 @@ int main(int argc, char **argv) {
     int errs = 0;
     errs += test_linear<1024,16>();
     errs += test_linear<32,32>();
+    errs += test_linear<16,16>();
     errs += test_linear<32,1>();
     errs += test_halfkp();
     errs += test_incremental();
