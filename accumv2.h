@@ -212,13 +212,11 @@ inline bool operator == (const AccumulatorV2<_OutputType,
     for (size_t h = 0; h < 2; ++h) {
         for (size_t i = 0; i < _size; ++i) {
             if (p[h][i] != q[h][i]) {
-                std::cout << "mismatch in accum" << std::endl;
                 return false;
             }
         }
         for (size_t i = 0; i < PSQBuckets; i++) {
             if (accum1._psq_accum[h][i] != accum2._psq_accum[h][i]) {
-                std::cout << "mismatch in psq" << std::endl;
                 return false;
             }
         }
