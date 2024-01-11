@@ -1,4 +1,4 @@
-// Copyright 2021-2023 by Jon Dart. All Rigths Reserved.
+// Copyright 2021-2024 by Jon Dart. All Rigths Reserved.
 #ifndef _NNUE_ACCUM_V2_H
 #define _NNUE_ACCUM_V2_H
 
@@ -34,30 +34,20 @@ class AccumulatorV2 {
     }
 
     void init(const BiasType *data) {
-        for (unsigned p = 0; p < 2; ++p) {
-            OutputType *out = _accum[p];
-#ifdef SIMD
-            simd::vec_copy<size,OutputType>(data,out);
-#else
-            for (size_t i = 0; i < size; ++i) {
-                out[i] = *data[i];
-            }
-#endif        
-        }
-        std::memset(_psq_accum[0],'\0',sizeof(PSQType)*psq_buckets);
-        std::memset(_psq_accum[1],'\0',sizeof(PSQType)*psq_buckets);
+        init_half(AccumulatorHalf::Lower,data);
+        init_half(AccumulatorHalf::Upper,data);
     }
 
     void init_half(AccumulatorHalf half, const BiasType *data) {
-        const OutputType *in = data;
         OutputType *out = _accum[halfToIndex(half)];
-#ifdef SIMD
-        simd::vec_copy<size,OutputType>(in,out);
-#else
-        for (size_t i = 0; i < size; ++i) {
-            *out++ = static_cast<OutputType>(*in++);
+        if constexpr (sizeof(OutputType) == sizeof(BiasType)) {
+            std::memcpy(out,data,sizeof(OutputType)*size);
         }
-#endif
+        else {
+            for (size_t i = 0; i < size; ++i) {
+                *out++ = *data++;
+            }
+        }
         std::memset(_psq_accum[halfToIndex(half)],'\0',sizeof(PSQType)*psq_buckets);
     }
 
@@ -68,13 +58,14 @@ class AccumulatorV2 {
                    AccumulatorHalf sourceHalf) {
         const WeightType *in = source._accum[halfToIndex(sourceHalf)];
         OutputType *out = _accum[halfToIndex(half)];
-#ifdef SIMD
-        simd::vec_copy<size,OutputType>(in,out);
-#else
-        for (size_t i = 0; i < size; ++i) {
-            *out++ = static_cast<OutputType>(*in++);
+        if constexpr (sizeof(OutputType) == sizeof(WeightType)) {
+            std::memcpy(out,in,sizeof(OutputType)*size);
         }
-#endif
+        else {
+            for (size_t i = 0; i < size; ++i) {
+                *out++ = static_cast<OutputType>(*in++);
+            }
+        }
         std::memcpy(_psq_accum[halfToIndex(half)],source._psq_accum[halfToIndex(sourceHalf)],sizeof(PSQType)*psq_buckets);
     }
 
@@ -88,7 +79,7 @@ class AccumulatorV2 {
             *out++ += static_cast<OutputType>(*in++);
         }
         for (size_t i = 0; i < psq_buckets; ++i) {
-            *psq_out++ += static_cast<OutputType>(*psq_in++);
+            *psq_out++ += static_cast<PSQType>(*psq_in++);
         }
     }
 
@@ -102,7 +93,7 @@ class AccumulatorV2 {
             *out++ -= static_cast<OutputType>(*in++);
         }
         for (size_t i = 0; i < psq_buckets; ++i) {
-            *psq_out++ -= static_cast<OutputType>(*psq_in++);
+            *psq_out++ -= static_cast<PSQType>(*psq_in++);
         }
     }
 
@@ -190,6 +181,7 @@ inline std::ostream & operator << (std::ostream &o, const AccumulatorV2<OutputTy
             if ((i+1)%64==0) std::cout << std::endl;
         }
     }
+    std::cout << std::endl << "psq: " << std::endl;
     for (unsigned p = 0; p < 2; ++p) {
         for (unsigned i = 0; i<PSQBuckets; ++i) {
             std::cout << static_cast<int>(accum._psq_accum[p][i]) << ' ';
