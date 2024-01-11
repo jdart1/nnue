@@ -1,4 +1,4 @@
-// Copyright 2021, 2022 by Jon Dart. All Rights Reserved
+// Copyright 2021, 2022, 2024 by Jon Dart. All Rights Reserved
 #ifndef _NNUE_SCALE_CLAMP_H
 #define _NNUE_SCALE_CLAMP_H
 
@@ -23,7 +23,7 @@ public:
         simd::scale_and_clamp<InputType, OutputType, size, scaleFactor>(input, output, _clampMax);
 #else
         for (size_t i = 0; i < size; i++) {
-            *output++ = static_cast<OutputType>(
+            output[i] = static_cast<OutputType>(
                                                 std::clamp<InputType>(input[i] >> scaleFactor, 0, _clampMax));
         }
 #endif
