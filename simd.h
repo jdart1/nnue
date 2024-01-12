@@ -390,14 +390,14 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
     if constexpr (outputSize * sizeof(AccumType) * 8 < simdWidth) {
         // special case, fall back to AVX2 because accum is not wide enough for AVX512
         __m256i *outp = reinterpret_cast<__m256i *>(target);
-        static_assert(outputSize * sizeof(AccumType) * 8 % 256 == 0,
-                      "expected width to be multiple of 256");
+        static_assert(outputSize * sizeof(AccumType) * 8 >= 256, "insufficient width for AVX2");
+        static_assert(outputSize * sizeof(AccumType) * 8 % 256 == 0, "expected width to be multiple of 256");
         // how many simdWidth registers are needed to process accumulator
         unsigned remaining = (outputSize * sizeof(AccumType) * 8) / 256;
         static constexpr unsigned regCount = 16;
         alignas(VEC_ALIGN) __m256i regs[regCount];
         for (unsigned num_chunks = std::min<unsigned>(regCount, remaining); remaining > 0;
-             remaining -= num_chunks, offset += num_chunks) {
+            remaining -= num_chunks, offset += num_chunks) {
             // load biases into registers
             if (biases) {
                 const __m256i *biasp = reinterpret_cast<const __m256i *>(*biases);
@@ -413,7 +413,10 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
             for (size_t i = 0; indices[i] != 1000000; ++i) {
                 const __m256i *w = reinterpret_cast<const __m256i *>((*weights)[indices[i]]);
                 for (size_t j = 0; j < num_chunks; ++j) {
-                    regs[j] = _mm256_add_epi16(regs[j], _mm256_load_si256(w + offset + j));
+		  if constexpr(sizeof(WeightType) == 2)
+                      regs[j] = _mm256_add_epi16(regs[j], _mm256_load_si256(w + offset + j));
+		  else
+                      regs[j] = _mm256_add_epi32(regs[j], _mm256_load_si256(w + offset + j));
                 }
             }
             // store results to memory
