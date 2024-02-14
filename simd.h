@@ -10,6 +10,14 @@ extern "C" {
 #endif
 }
 
+// fix for clang compile
+#ifndef _MM_PERM_BADC
+#define _MM_PERM_BADC 0x4E
+#endif
+#ifndef _MM_PERM_CDAB
+#define _MM_PERM_CDAB 0xB1
+#endif
+
 namespace simd {
 
 #ifdef AVX512
