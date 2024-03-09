@@ -108,7 +108,7 @@ static inline int32_t add4x32_neon(int32x4_t reg) {
 }
 #endif
 
-template <typename T, unsigned simdWidth> inline static size_t chunks(unsigned len) {
+template <typename T, unsigned simdWidth> inline static constexpr size_t chunks(unsigned len) {
     return (len * 8 * sizeof(T)) / simdWidth;
 }
 
@@ -340,7 +340,7 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
                   "BiasType different from WeightType not currently supported");
     unsigned offset = 0;
 #ifdef NEON
-    unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
+    size_t remaining = chunks<AccumType, simdWidth>((outputSize);
     alignas(VEC_ALIGN) vec_t regs[simdRegCount];
     if constexpr (sizeof(AccumType) == 2) {
         for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
@@ -401,7 +401,7 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
         static_assert(outputSize * sizeof(AccumType) * 8 >= 256, "insufficient width for AVX2");
         static_assert(outputSize * sizeof(AccumType) * 8 % 256 == 0, "expected width to be multiple of 256");
         // how many simdWidth registers are needed to process accumulator
-        unsigned remaining = (outputSize * sizeof(AccumType) * 8) / 256;
+        size_t remaining = chunks<AccumType,256>(outputSize);
         static constexpr unsigned regCount = 16;
         alignas(VEC_ALIGN) __m256i regs[regCount];
         for (unsigned num_chunks = std::min<unsigned>(regCount, remaining); remaining > 0;
@@ -442,7 +442,7 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
                       "accumulator size is not multiple of SIMD width");
         vec_t *outp = reinterpret_cast<vec_t *>(target);
         // how many simdWidth registers are needed to process accumulator
-        unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
+        size_t remaining = chunks<AccumType,simdWidth>(outputSize);
         alignas(VEC_ALIGN) vec_t regs[simdRegCount];
         for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
              remaining -= num_chunks, offset += num_chunks) {
@@ -487,7 +487,7 @@ void update(const AccumType *source, AccumType *target,
                   "AccumType different from WeightType not currently supported");
     unsigned offset = 0;
 #ifdef NEON
-    unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
+    size_t remaining = chunks<AccumType,simdWidth>(outputSize);
     alignas(VEC_ALIGN) vec_t regs[simdRegCount];
     if constexpr (sizeof(AccumType) == 2) {
         for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
@@ -551,7 +551,7 @@ void update(const AccumType *source, AccumType *target,
         static_assert(outputSize * sizeof(AccumType) * 8 % 256 == 0,
                       "expected width to be multiple of 256");
         // how many simdWidth registers are needed to process accumulator
-        unsigned remaining = (outputSize * sizeof(AccumType) * 8) / 256;
+        size_t remaining = chunks<AccumType,256>(outputSize);
         static constexpr unsigned regCount = 16;
         alignas(VEC_ALIGN) __m256i regs[regCount];
         for (unsigned num_chunks = std::min<unsigned>(regCount, remaining); remaining > 0;
@@ -594,7 +594,7 @@ void update(const AccumType *source, AccumType *target,
         const vec_t *inp = reinterpret_cast<const vec_t *>(source);
         vec_t *outp = reinterpret_cast<vec_t *>(target);
         // how many simdWidth registers are needed to process accumulator
-        unsigned remaining = (outputSize * sizeof(AccumType) * 8) / simdWidth;
+        size_t remaining = chunks<AccumType,simdWidth>(outputSize);
         alignas(VEC_ALIGN) vec_t regs[simdRegCount];
         for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
              remaining -= num_chunks, offset += num_chunks) {
