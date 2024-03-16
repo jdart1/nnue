@@ -77,7 +77,58 @@ static const vec_t zeros128 = vdupq_n_s16(0);
 #error must set at least one of: AVX512, AVX2, SSSE3, SSE2 or NEON
 #endif
 
-#ifndef NEON
+#ifdef NEON
+static inline int32_t add4x32_neon(int32x4_t reg) {
+#if defined(__aarch64__)
+    return vaddvq_s32(reg);
+#else
+    using ints = int32_t[4];
+    ints *inp = reinterpret_cast<ints *>(&reg);
+    int32_t sum = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        sum += (*inp)[i];
+    }
+    return sum;
+#endif
+}
+
+template <typename AccumType>
+struct SimdOperationsNeon {
+    static constexpr size_t bytes = sizeof(AccumType);
+    static inline vec_t load(const AccumType *x) {
+       if constexpr (bytes==2)
+           return vld1q_s16(x);
+       else
+           return vld1q_s32(x);
+    }
+    static inline vec_t add(vec_t x, vec_t y) {
+       if constexpr (bytes==2)
+           return vaddq_s16(x,y);
+       else
+           return vaddq_s32(x,y);
+    }
+    static inline vec_t sub(vec_t x, vec_t y) {
+       if constexpr (bytes==2)
+           return vsubq_s16(x,y);
+       else
+           return vsubq_s32(x,y);
+    }
+    static inline void store(AccumType *x, const vec_t y) {
+       if constexpr (bytes==2)
+           vst1q_s16(x,y);
+       else
+           vst1q_s32(x,y);
+    }
+    static inline vec_t zero() {
+       if constexpr (bytes==2)
+           return vdupq_n_s16(0);
+       else
+           return vdupq_n_s32(0);
+    }
+};
+
+#else // x86
+
 template <size_t bytes> static inline vec_t vec_add(vec_t x, const vec_t *y) {
     if constexpr (bytes == 2)
         return vec_add16(x, y);
@@ -117,22 +168,6 @@ struct SimdOperationsAvx2 {
     static inline void set_zero(vec_type &x) { x = zero256; }
 };
 
-#endif
-
-#ifdef NEON
-static inline int32_t add4x32_neon(int32x4_t reg) {
-#if defined(__aarch64__)
-    return vaddvq_s32(reg);
-#else
-    using ints = int32_t[4];
-    ints *inp = reinterpret_cast<ints *>(&reg);
-    int32_t sum = 0;
-    for (unsigned i = 0; i < 4; ++i) {
-        sum += (*inp)[i];
-    }
-    return sum;
-#endif
-}
 #endif
 
 template <typename T, unsigned simdWidth> inline static constexpr size_t chunks(unsigned len) {
@@ -356,10 +391,47 @@ template <size_t size, typename DataType> inline void vec_copy(const DataType *i
     }
 }
 
+template <typename AccumType, typename WeightType, typename BiasType,
+          size_t inputSize /* features */, size_t outputSize /* accumulator size */,
+          size_t regCount, size_t regWidth, size_t iterations, typename operations>
+inline void
+fullUpdateLoopNeon(AccumType *target, const WeightType (*weights)[inputSize][outputSize],
+                   const BiasType (*biases)[outputSize], const unsigned *indices, size_t &offset) {
+    static_assert(outputSize * sizeof(AccumType) * 8 >= simdWidth,
+                  "insufficient accumulator width");
+    static_assert(outputSize * sizeof(AccumType) * 8 % simdWidth == 0,
+                  "accumulator size is not multiple of SIMD width");
+    constexpr size_t indexMultipler = simdWidth / (8 * sizeof(AccumType));
+    alignas(VEC_ALIGN) vec_t regs[regCount];
+    for (size_t iter = 0; iter < iterations; ++iter, offset += regCount) {
+        // load biases into registers
+        if (biases) {
+            for (size_t i = 0; i < regCount; ++i) {
+                regs[i] = operations::load((*biases) + indexMultipler * (offset + i));
+            }
+        } else {
+            for (size_t i = 0; i < regCount; ++i) {
+                regs[i] = operations::zero();
+            }
+        }
+        // perform updates in registers
+        for (size_t i = 0; indices[i] != 1000000; ++i) {
+            const auto w = (*weights)[indices[i]];
+            for (size_t j = 0; j < regCount; ++j) {
+                regs[j] =
+                    operations::add(regs[j], operations::load(w + indexMultipler * (offset + j)));
+            }
+        }
+        // store results to memory
+        for (size_t i = 0; i < regCount; ++i) {
+            operations::store(target + indexMultipler * (offset + i), regs[i]);
+        }
+    }
+}
+
 template <typename vec_type, typename AccumType, typename WeightType, typename BiasType,
           size_t inputSize /* features */, size_t outputSize /* accumulator size */,
-          size_t regCount, size_t regWidth, size_t iterations,
-          typename operations>
+          size_t regCount, size_t regWidth, size_t iterations, typename operations>
 inline void fullUpdateLoop(AccumType *target, const WeightType (*weights)[inputSize][outputSize],
                            const BiasType (*biases)[outputSize], const unsigned *indices,
                            size_t &offset) {
@@ -406,58 +478,21 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
                   "BiasType different from WeightType not currently supported");
     size_t offset = 0;
 #ifdef NEON
-    size_t remaining = chunks<AccumType, simdWidth>((outputSize);
-    alignas(VEC_ALIGN) vec_t regs[simdRegCount];
-    if constexpr (sizeof(AccumType) == 2) {
-        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
-             remaining -= num_chunks, offset += num_chunks) {
-            // load biases into registers
-            if (biases) {
-                for (size_t i = 0; i < num_chunks; ++i) {
-                    regs[i] = vld1q_s16((*biases) + 8*(offset + i));
-                }
-            } else {
-                for (size_t i = 0; i < num_chunks; ++i) {
-                    regs[i] = vdupq_n_s16(0);
-                }
-            }
-            // perform updates in registers
-            for (size_t i = 0; indices[i] != 1000000; ++i) {
-                const auto w = (*weights)[indices[i]];
-                for (size_t j = 0; j < num_chunks; ++j) {
-                    regs[j] = vaddq_s16(regs[j], vld1q_s16(w + 8*(offset + j)));
-                }
-            }
-            // store results to memory
-            for (size_t i = 0; i < num_chunks; ++i) {
-                vst1q_s16(target + 8*(offset + i), regs[i]);
-            }
-        }
-    } else { // 32-bit
-        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
-             remaining -= num_chunks, offset += num_chunks) {
-            // load biases into registers
-            if (biases) {
-                for (size_t i = 0; i < num_chunks; ++i) {
-                    regs[i] = vld1q_s32((*biases) + 4*(offset + i));
-                }
-            } else {
-                for (size_t i = 0; i < num_chunks; ++i) {
-                    regs[i] = vdupq_n_s32(0);
-                }
-            }
-            // perform updates in registers
-            for (size_t i = 0; indices[i] != 1000000; ++i) {
-                const auto w = (*weights)[indices[i]];
-                for (size_t j = 0; j < num_chunks; ++j) {
-                    regs[j] = vaddq_s32(regs[j], vld1q_s32(w + 4*(offset + j)));
-                }
-            }
-            // store results to memory
-            for (size_t i = 0; i < num_chunks; ++i) {
-                vst1q_s32(target + 4*(offset + i), regs[i]);
-            }
-        }
+    constexpr size_t registerWidths = chunks<AccumType, simdWidth>(outputSize);
+    // It is faster here to not reserve all registers for storing intermediate results,
+    // because NEON vector operations except load/store operate on registers only.
+    constexpr size_t regCount = simdRegCount / 2;
+    constexpr size_t iterations = registerWidths / regCount;
+    constexpr size_t remaining = registerWidths % regCount;
+    if constexpr (iterations > 0) {
+        fullUpdateLoopNeon<AccumType, WeightType, BiasType, inputSize, outputSize, regCount,
+                           simdWidth, iterations, SimdOperationsNeon<AccumType>>(
+            target, weights, biases, indices, offset);
+    }
+    if constexpr (remaining > 0) {
+        fullUpdateLoopNeon<AccumType, WeightType, BiasType, inputSize, outputSize, remaining,
+                           simdWidth, 1, SimdOperationsNeon<AccumType>>(target, weights, biases,
+                                                                         indices, offset);
     }
 #else
 #if defined(AVX512)
@@ -498,11 +533,47 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
 #endif
 }
 
+template <typename AccumType, typename WeightType, size_t inputSize /* features */,
+          size_t outputSize /* accumulator size */, size_t regCount, size_t regWidth,
+          size_t iterations, typename operations>
+inline void updateLoopNeon(const AccumType *source, AccumType *target,
+                           const WeightType (&weights)[inputSize][outputSize],
+                           const unsigned *added, unsigned added_count, const unsigned *removed,
+                           unsigned removed_count, size_t &offset) {
+    alignas(VEC_ALIGN) vec_t regs[regCount];
+    constexpr size_t indexMultiplier = simdWidth / (8 * sizeof(AccumType));
+    for (size_t iter = 0; iter < iterations; ++iter, offset += regCount) {
+        // load source into registers
+        for (size_t i = 0; i < regCount; ++i) {
+            regs[i] = operations::load(source + indexMultiplier * (offset + i));
+        }
+        // perform updates in registers
+        for (size_t i = 0; i < added_count; ++i) {
+            const auto *w = weights[added[i]];
+            for (size_t j = 0; j < regCount; ++j) {
+                regs[j] =
+                    operations::add(regs[j], operations::load(w + indexMultiplier * (offset + j)));
+            }
+        }
+        for (size_t i = 0; i < removed_count; ++i) {
+            const auto *w = weights[removed[i]];
+            for (size_t j = 0; j < regCount; ++j) {
+                regs[j] =
+                    operations::sub(regs[j], operations::load(w + indexMultiplier * (offset + j)));
+            }
+        }
+        // store results to memory
+        for (size_t i = 0; i < regCount; ++i) {
+            operations::store(target + indexMultiplier * (offset + i), regs[i]);
+        }
+    }
+}
+
 template <typename vec_type, typename AccumType, typename WeightType,
           size_t inputSize /* features */, size_t outputSize /* accumulator size */,
           size_t regCount, size_t regWidth, size_t iterations, typename operations>
-inline void updateLoop(const AccumType *source, AccumType *target, const WeightType (&weights)[inputSize][outputSize],
-                       const unsigned *added,
+inline void updateLoop(const AccumType *source, AccumType *target,
+                       const WeightType (&weights)[inputSize][outputSize], const unsigned *added,
                        unsigned added_count, const unsigned *removed, unsigned removed_count,
                        size_t &offset) {
     static_assert(outputSize * sizeof(AccumType) * 8 >= simdWidth,
@@ -551,58 +622,25 @@ void update(const AccumType *source, AccumType *target,
                   "AccumType different from WeightType not currently supported");
     size_t offset = 0;
 #ifdef NEON
-    size_t remaining = chunks<AccumType, simdWidth>(outputSize);
-    alignas(VEC_ALIGN) vec_t regs[simdRegCount];
-    if constexpr (sizeof(AccumType) == 2) {
-        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
-             remaining -= num_chunks, offset += num_chunks) {
-            // load source into registers
-            for (size_t i = 0; i < num_chunks; ++i) {
-                regs[i] = vld1q_s16(source + 8 * (offset + i));
-            }
-            // perform updates in registers
-            for (size_t i = 0; i < added_count; ++i) {
-                const auto *w = weights[added[i]];
-                for (size_t j = 0; j < num_chunks; ++j) {
-                    regs[j] = vaddq_s16(regs[j], vld1q_s16(w + 8 * (offset + j)));
-                }
-            }
-            for (size_t i = 0; i < removed_count; ++i) {
-                const auto *w = weights[removed[i]];
-                for (size_t j = 0; j < num_chunks; ++j) {
-                    regs[j] = vsubq_s16(regs[j], vld1q_s16(w + 8 * (offset + j)));
-                }
-            }
-            // store results to memory
-            for (size_t i = 0; i < num_chunks; ++i) {
-                vst1q_s16(target + 8 * (offset + i), regs[i]);
-            }
-        }
-    } else { // 32-bit
-        for (unsigned num_chunks = std::min<unsigned>(simdRegCount, remaining); remaining > 0;
-             remaining -= num_chunks, offset += num_chunks) {
-            // load source into registers
-            for (size_t i = 0; i < num_chunks; ++i) {
-                regs[i] = vld1q_s32(source + 4 * (offset + i));
-            }
-            // perform updates in registers
-            for (size_t i = 0; i < added_count; ++i) {
-                const auto *w = weights[added[i]];
-                for (size_t j = 0; j < num_chunks; ++j) {
-                    regs[j] = vaddq_s32(regs[j], vld1q_s32(w + 4 * (offset + j)));
-                }
-            }
-            for (size_t i = 0; i < removed_count; ++i) {
-                const auto *w = weights[removed[i]];
-                for (size_t j = 0; j < num_chunks; ++j) {
-                    regs[j] = vsubq_s32(regs[j], vld1q_s32(w + 4 * (offset + j)));
-                }
-            }
-            // store results to memory
-            for (size_t i = 0; i < num_chunks; ++i) {
-                vst1q_s32(target + 4 * (offset + i), regs[i]);
-            }
-        }
+    static_assert(outputSize * sizeof(AccumType) * 8 >= simdWidth,
+                  "insufficient accumulator width");
+    static_assert(outputSize * sizeof(AccumType) * 8 % simdWidth == 0,
+                  "accumulator size is not multiple of SIMD width");
+    constexpr size_t registerWidths = chunks<AccumType, simdWidth>(outputSize);
+    // It is faster here to not reserve all registers for storing intermediate results,
+    // because NEON vector operations except load/store operate on registers only.
+    constexpr size_t regCount = simdRegCount / 2;
+    constexpr size_t iterations = registerWidths / regCount;
+    constexpr size_t remaining = registerWidths % regCount;
+    if constexpr (iterations > 0) {
+        updateLoopNeon<AccumType, WeightType, inputSize, outputSize, regCount, simdWidth,
+                       iterations, SimdOperationsNeon<AccumType>>(
+            source, target, weights, added, added_count, removed, removed_count, offset);
+    }
+    if constexpr (remaining > 0) {
+        updateLoopNeon<AccumType, WeightType, inputSize, outputSize, remaining, simdWidth, 1,
+                       SimdOperationsNeon<AccumType>>(source, target, weights, added, added_count,
+                                                      removed, removed_count, offset);
     }
 #else
 #if defined(AVX512)
