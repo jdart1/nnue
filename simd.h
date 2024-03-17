@@ -435,16 +435,16 @@ template <typename vec_type, typename AccumType, typename WeightType, typename B
 inline void fullUpdateLoop(AccumType *target, const WeightType (*weights)[inputSize][outputSize],
                            const BiasType (*biases)[outputSize], const unsigned *indices,
                            size_t &offset) {
-    static_assert(outputSize * sizeof(AccumType) * 8 >= simdWidth,
+    static_assert(outputSize * sizeof(AccumType) * 8 >= regWidth,
                   "insufficient accumulator width");
-    static_assert(outputSize * sizeof(AccumType) * 8 % simdWidth == 0,
+    static_assert(outputSize * sizeof(AccumType) * 8 % regWidth == 0,
                   "accumulator size is not multiple of SIMD width");
-    vec_t *outp = reinterpret_cast<vec_t *>(target);
+    vec_type *outp = reinterpret_cast<vec_type *>(target);
     alignas(VEC_ALIGN) vec_type regs[regCount];
     for (size_t iter = 0; iter < iterations; ++iter, offset += regCount) {
         // load biases into registers
         if (biases) {
-            const vec_t *biasp = reinterpret_cast<const vec_type *>(*biases);
+            const vec_type *biasp = reinterpret_cast<const vec_type *>(*biases);
             for (size_t i = 0; i < regCount; ++i) {
                 regs[i] = operations::load(biasp + offset + i);
             }
@@ -576,10 +576,10 @@ inline void updateLoop(const AccumType *source, AccumType *target,
                        const WeightType (&weights)[inputSize][outputSize], const unsigned *added,
                        unsigned added_count, const unsigned *removed, unsigned removed_count,
                        size_t &offset) {
-    static_assert(outputSize * sizeof(AccumType) * 8 >= simdWidth,
+    static_assert(outputSize * sizeof(AccumType) * 8 >= regWidth,
                   "insufficient accumulator width");
-    static_assert(outputSize * sizeof(AccumType) * 8 % simdWidth == 0,
-                  "accumulator size is not multiple of SIMD width");
+    static_assert(outputSize * sizeof(AccumType) * 8 % regWidth == 0,
+                  "accumulator size is not multiple of SIMD register width");
     vec_type *outp = reinterpret_cast<vec_type *>(target);
     const vec_type *inp = reinterpret_cast<const vec_type *>(source);
     alignas(VEC_ALIGN) vec_type regs[regCount];
@@ -590,13 +590,13 @@ inline void updateLoop(const AccumType *source, AccumType *target,
         }
         // perform updates in registers
         for (size_t i = 0; i < added_count; ++i) {
-            const vec_t *w = reinterpret_cast<const vec_type *>(weights[added[i]]);
+            const vec_type *w = reinterpret_cast<const vec_type *>(weights[added[i]]);
             for (size_t j = 0; j < regCount; ++j) {
                 regs[j] = operations::add(regs[j], w + offset + j);
             }
         }
         for (size_t i = 0; i < removed_count; ++i) {
-            const vec_t *w = reinterpret_cast<const vec_type *>(weights[removed[i]]);
+            const vec_type *w = reinterpret_cast<const vec_type *>(weights[removed[i]]);
             for (size_t j = 0; j < regCount; ++j) {
                 regs[j] = operations::sub(regs[j], w + offset + j);
             }
