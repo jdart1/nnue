@@ -85,10 +85,10 @@ public:
         // post-process accumulator
         halfKaMultClamp->postProcessAccum(accum,
                                           reinterpret_cast<uint8_t*>(buffer));
-        size_t inputOffset = 0, outputOffset = halfKaMultClamp->getOutputSize(), lastOffset;
+        size_t inputOffset = 0, outputOffset = halfKaMultClamp->getOutputSize(), lastOffset = 0;
         // evaluate the remaining layers, in the correct bucket
         int layer = 0;
-        int fwdOut;
+        int fwdOut = 0;
         for (const auto &it : layers[bucket]) {
             it->forward(static_cast<const void *>(buffer + inputOffset),
                         static_cast<void *>(buffer + outputOffset));
