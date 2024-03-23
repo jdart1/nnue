@@ -152,6 +152,7 @@ struct SimdOperations {
     static inline void set_zero(vec_t &x) { x = zero; }
 };
 
+#ifdef AVX2
 template <size_t bytes>
 struct SimdOperationsAvx2 {
     using vec_type = __m256i;
@@ -167,6 +168,7 @@ struct SimdOperationsAvx2 {
     static inline void store(vec_type *x, const vec_type y) { _mm256_store_si256(x, y); }
     static inline void set_zero(vec_type &x) { x = zero256; }
 };
+#endif
 
 #endif
 
