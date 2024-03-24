@@ -540,8 +540,8 @@ template <typename AccumType, typename WeightType, size_t inputSize /* features 
           size_t iterations, typename operations>
 inline void updateLoopNeon(const AccumType *source, AccumType *target,
                            const WeightType (&weights)[inputSize][outputSize],
-                           const unsigned *added, unsigned added_count, const unsigned *removed,
-                           unsigned removed_count, size_t &offset) {
+                           const unsigned *added, size_t added_count, const unsigned *removed,
+                           size_t removed_count, size_t &offset) {
     alignas(VEC_ALIGN) vec_t regs[regCount];
     constexpr size_t indexMultiplier = simdWidth / (8 * sizeof(AccumType));
     for (size_t iter = 0; iter < iterations; ++iter, offset += regCount) {
@@ -576,7 +576,7 @@ template <typename vec_type, typename AccumType, typename WeightType,
           size_t regCount, size_t regWidth, size_t iterations, typename operations>
 inline void updateLoop(const AccumType *source, AccumType *target,
                        const WeightType (&weights)[inputSize][outputSize], const unsigned *added,
-                       unsigned added_count, const unsigned *removed, unsigned removed_count,
+                       size_t added_count, const unsigned *removed, size_t removed_count,
                        size_t &offset) {
     static_assert(outputSize * sizeof(AccumType) * 8 >= regWidth,
                   "insufficient accumulator width");
