@@ -68,6 +68,8 @@ static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm_sub_epi16(x,
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm_sub_epi32(x, vec_load(y)); }
 #elif defined(NEON)
 using vec_t = int16x8_t;
+using vec16_t = int16x8_t;
+using vec32_t = int32x4_t;
 static constexpr size_t VEC_ALIGN = 32;
 static constexpr size_t simdWidth = 128;
 static constexpr size_t simdRegCount = 16;
@@ -92,34 +94,33 @@ static inline int32_t add4x32_neon(int32x4_t reg) {
 #endif
 }
 
-template <typename AccumType>
+template <typename vec_type, typename AccumType, size_t bytes>
 struct SimdOperationsNeon {
-    static constexpr size_t bytes = sizeof(AccumType);
-    static inline vec_t load(const AccumType *x) {
+    static inline vec_type load(const AccumType *x) {
        if constexpr (bytes==2)
            return vld1q_s16(x);
        else
            return vld1q_s32(x);
     }
-    static inline vec_t add(vec_t x, vec_t y) {
+    static inline vec_type add(vec_type x, vec_type y) {
        if constexpr (bytes==2)
            return vaddq_s16(x,y);
        else
            return vaddq_s32(x,y);
     }
-    static inline vec_t sub(vec_t x, vec_t y) {
+    static inline vec_type sub(vec_type x, vec_type y) {
        if constexpr (bytes==2)
            return vsubq_s16(x,y);
        else
            return vsubq_s32(x,y);
     }
-    static inline void store(AccumType *x, const vec_t y) {
+    static inline void store(AccumType *x, const vec_type y) {
        if constexpr (bytes==2)
            vst1q_s16(x,y);
        else
            vst1q_s32(x,y);
     }
-    static inline vec_t zero() {
+    static inline vec_type zero() {
        if constexpr (bytes==2)
            return vdupq_n_s16(0);
        else
@@ -393,7 +394,7 @@ template <size_t size, typename DataType> inline void vec_copy(const DataType *i
     }
 }
 
-template <typename AccumType, typename WeightType, typename BiasType,
+template <typename vec_type, typename AccumType, typename WeightType, typename BiasType,
           size_t inputSize /* features */, size_t outputSize /* accumulator size */,
           size_t regCount, size_t regWidth, size_t iterations, typename operations>
 inline void
@@ -404,7 +405,7 @@ fullUpdateLoopNeon(AccumType *target, const WeightType (*weights)[inputSize][out
     static_assert(outputSize * sizeof(AccumType) * 8 % simdWidth == 0,
                   "accumulator size is not multiple of SIMD width");
     constexpr size_t indexMultipler = simdWidth / (8 * sizeof(AccumType));
-    alignas(VEC_ALIGN) vec_t regs[regCount];
+    alignas(VEC_ALIGN) vec_type regs[regCount];
     for (size_t iter = 0; iter < iterations; ++iter, offset += regCount) {
         // load biases into registers
         if (biases) {
@@ -487,14 +488,26 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
     constexpr size_t iterations = registerWidths / regCount;
     constexpr size_t remaining = registerWidths % regCount;
     if constexpr (iterations > 0) {
-        fullUpdateLoopNeon<AccumType, WeightType, BiasType, inputSize, outputSize, regCount,
-                           simdWidth, iterations, SimdOperationsNeon<AccumType>>(
-            target, weights, biases, indices, offset);
+        if constexpr (sizeof(AccumType) == 2)
+            fullUpdateLoopNeon<vec16_t, AccumType, WeightType, BiasType, inputSize, outputSize,
+                               regCount, simdWidth, iterations,
+                               SimdOperationsNeon<vec16_t, AccumType, 2>>(target, weights, biases,
+                                                                          indices, offset);
+        else
+            fullUpdateLoopNeon<vec32_t, AccumType, WeightType, BiasType, inputSize, outputSize,
+                               regCount, simdWidth, iterations,
+                               SimdOperationsNeon<vec32_t, AccumType, 4>>(target, weights, biases,
+                                                                          indices, offset);
     }
     if constexpr (remaining > 0) {
-        fullUpdateLoopNeon<AccumType, WeightType, BiasType, inputSize, outputSize, remaining,
-                           simdWidth, 1, SimdOperationsNeon<AccumType>>(target, weights, biases,
-                                                                         indices, offset);
+        if constexpr (sizeof(AccumType) == 2)
+            fullUpdateLoopNeon<vec16_t, AccumType, WeightType, BiasType, inputSize, outputSize,
+                               remaining, simdWidth, 1, SimdOperationsNeon<vec16_t, AccumType, 2>>(
+                target, weights, biases, indices, offset);
+        else
+            fullUpdateLoopNeon<vec32_t, AccumType, WeightType, BiasType, inputSize, outputSize,
+                               remaining, simdWidth, 1, SimdOperationsNeon<vec32_t, AccumType, 4>>(
+                target, weights, biases, indices, offset);
     }
 #else
 #if defined(AVX512)
@@ -535,15 +548,15 @@ void fullUpdate(AccumType *target, const WeightType (*weights)[inputSize][output
 #endif
 }
 
-template <typename AccumType, typename WeightType, size_t inputSize /* features */,
+template <typename vec_type, typename AccumType, typename WeightType, size_t inputSize /* features */,
           size_t outputSize /* accumulator size */, size_t regCount, size_t regWidth,
           size_t iterations, typename operations>
 inline void updateLoopNeon(const AccumType *source, AccumType *target,
                            const WeightType (&weights)[inputSize][outputSize],
                            const unsigned *added, size_t added_count, const unsigned *removed,
                            size_t removed_count, size_t &offset) {
-    alignas(VEC_ALIGN) vec_t regs[regCount];
     constexpr size_t indexMultiplier = simdWidth / (8 * sizeof(AccumType));
+    alignas(VEC_ALIGN) vec_type regs[regCount];
     for (size_t iter = 0; iter < iterations; ++iter, offset += regCount) {
         // load source into registers
         for (size_t i = 0; i < regCount; ++i) {
@@ -635,14 +648,24 @@ void update(const AccumType *source, AccumType *target,
     constexpr size_t iterations = registerWidths / regCount;
     constexpr size_t remaining = registerWidths % regCount;
     if constexpr (iterations > 0) {
-        updateLoopNeon<AccumType, WeightType, inputSize, outputSize, regCount, simdWidth,
-                       iterations, SimdOperationsNeon<AccumType>>(
+        if constexpr (sizeof(AccumType)==2) 
+            updateLoopNeon<vec16_t, AccumType, WeightType, inputSize, outputSize, regCount, simdWidth,
+                       iterations, SimdOperationsNeon<vec16_t, AccumType, sizeof(AccumType)>>(
+            source, target, weights, added, added_count, removed, removed_count, offset);
+        else
+            updateLoopNeon<vec32_t, AccumType, WeightType, inputSize, outputSize, regCount, simdWidth,
+                       iterations, SimdOperationsNeon<vec32_t, AccumType, sizeof(AccumType)>>(
             source, target, weights, added, added_count, removed, removed_count, offset);
     }
     if constexpr (remaining > 0) {
-        updateLoopNeon<AccumType, WeightType, inputSize, outputSize, remaining, simdWidth, 1,
-                       SimdOperationsNeon<AccumType>>(source, target, weights, added, added_count,
-                                                      removed, removed_count, offset);
+        if constexpr (sizeof(AccumType) == 2)
+            updateLoopNeon<vec16_t, AccumType, WeightType, inputSize, outputSize, remaining,
+                           simdWidth, 1, SimdOperationsNeon<vec16_t, AccumType, sizeof(AccumType)>>(
+                source, target, weights, added, added_count, removed, removed_count, offset);
+        else
+            updateLoopNeon<vec32_t, AccumType, WeightType, inputSize, outputSize, remaining,
+                           simdWidth, 1, SimdOperationsNeon<vec32_t, AccumType, sizeof(AccumType)>>(
+                source, target, weights, added, added_count, removed, removed_count, offset);
     }
 #else
 #if defined(AVX512)
@@ -692,9 +715,9 @@ template <size_t size, typename InType, typename OutType>
 inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampMax) {
     // TBD: can use AVX512 here?
 #if defined(NEON)
-    vec_t *outp = reinterpret_cast<vec_t *>(out);
-    const int8x16_t packedZeros = vdupq_n_s8(0);
-    const int8x16_t packedMax = vdupq_n_s16(clampMax);
+    int8x16_t *outp = reinterpret_cast<int8x16_t *>(out);
+    const vec_t packedZeros = vdupq_n_s16(0);
+    const vec_t packedMax = vdupq_n_s16(clampMax);
     size_t j = 0;
     for (size_t i = 0; i < chunks<OutType, simdWidth>(size); ++i, j += 2) {
         vec_t words0 = vld1q_s16(in + 8 * (j + 0));
@@ -739,9 +762,9 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
     static_assert(sizeof(InType) == 4 && sizeof(OutType) == 1,
                   "conditions not met for scale_and_clamp SIMD implementation");
 #ifdef NEON
-    vec_t *outp = reinterpret_cast<vec_t *>(out);
-    const int8x16_t packedZeros = vdupq_n_s8(0);
-    const int8x16_t packedMax = vdupq_n_s16(clampMax);
+    int8x16_t *outp = reinterpret_cast<int8x16_t *>(out);
+    const vec_t packedZeros = vdupq_n_s16(0);
+    const vec_t packedMax = vdupq_n_s16(clampMax);
     size_t j = 0;
     static_assert(size * 8 >= simdWidth && size * 8 % simdWidth == 0,
                   "conditions not met for scale_and_clamp SIMD implementation");
@@ -751,8 +774,8 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
         int32x4_t r2 = vld1q_s32(in + 4 * (j + 2));
         int32x4_t r3 = vld1q_s32(in + 4 * (j + 3));
         // shift and narrow
-        int8x16_t words0 = vcombine_s16(vshrn_n_s32(r0, rshift), vshrn_n_s32(r1, rshift));
-        int8x16_t words1 = vcombine_s16(vshrn_n_s32(r2, rshift), vshrn_n_s32(r3, rshift));
+        vec_t words0 = vcombine_s16(vshrn_n_s32(r0, rshift), vshrn_n_s32(r1, rshift));
+        vec_t words1 = vcombine_s16(vshrn_n_s32(r2, rshift), vshrn_n_s32(r3, rshift));
         // do min/max
         vec_t out0 = vminq_s16(vmaxq_s16(words0, packedZeros), packedMax);
         vec_t out1 = vminq_s16(vmaxq_s16(words1, packedZeros), packedMax);
@@ -813,9 +836,9 @@ static inline void multAndSum(const InType *input, OutType *output) {
     static_assert(size * 8 >= simdWidth && size * 8 % simdWidth == 0);
 
 #ifdef NEON
-    vec_t *outp = reinterpret_cast<vec_t *>(output);
-    const int8x16_t packedZeros = vdupq_n_s16(0);
-    const int8x16_t packedMax = vdupq_n_s16(clampMax);
+    int8x16_t *outp = reinterpret_cast<int8x16_t *>(output);
+    const int16x8_t packedZeros = vdupq_n_s16(0);
+    const int16x8_t packedMax = vdupq_n_s16(clampMax);
     const int16x8_t *inp0 = reinterpret_cast<const int16x8_t *>(input);
     const int16x8_t *inp1 = reinterpret_cast<const int16x8_t *>(input + size);
     size_t j = 0;
