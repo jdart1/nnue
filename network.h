@@ -3,8 +3,7 @@
 #define _NNUE_NETWORK_H
 
 #include "accumv2.h"
-#include "layers/base.h"
-#include "layers/halfkav2hm.h"
+#include "features/halfkav2hm.h"
 #include "layers/sqrcrelu.h"
 #include "layers/linear.h"
 #include "layers/crelu.h"

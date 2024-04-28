@@ -2,8 +2,9 @@
 #ifndef _NNUE_HALF_KA_V2_HM_H
 #define _NNUE_HALF_KA_V2_HM_H
 
+#include "nndefs.h"
 #include "accumv2.h"
-#include "typed.h"
+#include "util.h"
 
 // Implements first layer of the neural network, in the "Stockfish v4" network architecture
 // used in Stockfish 15.
@@ -11,7 +12,7 @@
 // that the King is always on files e..h.
 template <typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
           size_t outputSize, size_t alignment = DEFAULT_ALIGN>
-class HalfKaV2Hm : public TypedLayer<InputType, OutputType, inputSize, outputSize, alignment>
+class HalfKaV2Hm
 {
 public:
     // fixed, currently
