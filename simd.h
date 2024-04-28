@@ -758,16 +758,16 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
 }
 
 template <typename InType, typename OutType, size_t size, unsigned rshift>
-inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampMax) {
+inline void CRelU(const InType *in, OutType *out, [[maybe_unused]] InType clampMax) {
     static_assert(sizeof(InType) == 4 && sizeof(OutType) == 1,
-                  "conditions not met for scale_and_clamp SIMD implementation");
+                  "conditions not met for SIMD CRelU implementation");
 #ifdef NEON
     int8x16_t *outp = reinterpret_cast<int8x16_t *>(out);
     const vec_t packedZeros = vdupq_n_s16(0);
     const vec_t packedMax = vdupq_n_s16(clampMax);
     size_t j = 0;
     static_assert(size * 8 >= simdWidth && size * 8 % simdWidth == 0,
-                  "conditions not met for scale_and_clamp SIMD implementation");
+                  "conditions not met for SIMD CRelU implementation");
     for (size_t i = 0; i < chunks<OutType, simdWidth>(size); ++i, j += 4) {
         int32x4_t r0 = vld1q_s32(in + 4 * (j + 0));
         int32x4_t r1 = vld1q_s32(in + 4 * (j + 1));
@@ -788,7 +788,7 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
         const __m256i *inp = reinterpret_cast<const __m256i *>(in);
         __m256i *outp = reinterpret_cast<__m256i *>(out);
         static_assert(size * 8 % 256 == 0,
-                      "conditions not met for scale_and_clamp SIMD implementation");
+                      "conditions not met for SIMD CRelU implementation");
         const __m256i control = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
         for (size_t i = 0; i < chunks<OutType, 256>(size); ++i) {
             // load 2x256 bit registers of shifted input data (32 bit input, 16 bit output)
@@ -808,7 +808,7 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
         const __m128i *inp = reinterpret_cast<const __m128i *>(in);
         __m128i *outp = reinterpret_cast<__m128i *>(out);
         static_assert(size * 8 % 128 == 0,
-                      "conditions not met for scale_and_clamp SIMD implementation");
+                      "conditions not met for SIMD CRelU implementation");
         for (size_t i = 0; i < chunks<OutType, 128>(size); ++i) {
             // load 2x128 bit registers of shifted input data (32 bit input, 16 bit output) and
             // clamp
@@ -827,10 +827,10 @@ inline void scale_and_clamp(const InType *in, OutType *out, [[maybe_unused]] InT
 #endif
 }
 
-// implements the second layer of the SFv4 net, transforming the output of one half of the
-// accumulator into a uint8_t vector
+// implements the second layer of the SFv4 net, transforming the outputs of the feature layer
+// into a uint8_t vector
 template <typename InType, typename OutType, size_t size, unsigned clampMax, unsigned shift>
-static inline void multAndSum(const InType *input, OutType *output) {
+static inline void sqrCRelU(const InType *input, OutType *output) {
     // currently assume fixed size types
     static_assert(sizeof(InType) == 2 && sizeof(OutType) == 1);
     static_assert(size * 8 >= simdWidth && size * 8 % simdWidth == 0);

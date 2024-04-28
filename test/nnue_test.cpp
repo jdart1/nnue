@@ -329,7 +329,7 @@ static int test_halfkp() {
     }
 
     // test 1st layer output transformer
-    nnue::HalfKaOutput<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
+    nnue::SqrCRelU<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
 
 #ifdef AVX52
     alignas(64) uint8_t out[HalfKaV2Hm::OutputSize];
@@ -345,7 +345,7 @@ static int test_halfkp() {
         if (out[i] != expected2[i]) ++errs;
     }
     if (errs != tmp_err) {
-        std::cerr << "errors in layer 2: HalfKaOutput" << std::endl;
+        std::cerr << "errors in layer 2: SqrCRelU" << std::endl;
     }
 
     return errs;
@@ -546,45 +546,19 @@ static int test_incremental() {
     return errs;
 }
 
-static int test_clamp() {
-    int errs = 0;
-    using InputType = int16_t;
-    using OutputType = uint8_t;
-    constexpr unsigned SIZE = 512;
-    constexpr uint8_t CLAMP_MAX = 127;
-    using Clamper = nnue::Clamp<InputType, OutputType, SIZE>;
-
-    alignas(nnue::DEFAULT_ALIGN) InputType input[SIZE];
-    alignas(nnue::DEFAULT_ALIGN) OutputType output[SIZE],output2[SIZE];
-
-    Clamper c(CLAMP_MAX);
-
-    for (unsigned i = 0; i < SIZE; i++) {
-        input[i] = (i%20)-10 + (i%6)*30;
-        output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i],0,static_cast<InputType>(CLAMP_MAX)));
-    }
-    std::memset(output2,'\0',SIZE*sizeof(OutputType));
-    c.doForward(input,output2);
-    for (unsigned i = 0; i < SIZE; i++) {
-        errs += output2[i] != output[i];
-    }
-    if (errs) std::cerr << errs << " error(s) in clamp function" << std::endl;
-    return errs;
-}
-
 template<size_t size>
-static int test_scale_and_clamp() {
+static int test_CRelU() {
     int errs = 0;
     constexpr int CLAMP_MAX = 127;
     constexpr int RSHIFT = 6;
     using InputType = int32_t;
     using OutputType = uint8_t;
-    using ScaleAndClamper = nnue::ScaleAndClamp<InputType, OutputType, size, RSHIFT>;
+    using CRelU = nnue::CRelU<InputType, OutputType, size, RSHIFT>;
 
     alignas(nnue::DEFAULT_ALIGN) InputType input[size];
     alignas(nnue::DEFAULT_ALIGN) OutputType output[size],output2[size];
 
-    ScaleAndClamper c(CLAMP_MAX);
+    CRelU c(CLAMP_MAX);
 
     for (unsigned i = 0; i < size; i++) {
         input[i] = -9000 + 900*std::min<unsigned>(i,10) + i;
@@ -609,9 +583,8 @@ int main(int argc, char **argv) {
     errs += test_linear<32,1>();
     errs += test_halfkp();
     errs += test_incremental();
-    errs += test_clamp();
-    errs += test_scale_and_clamp<16>();
-    errs += test_scale_and_clamp<32>();
+    errs += test_CRelU<16>();
+    errs += test_CRelU<32>();
     std::cerr << errs << " errors" << std::endl;
 
     std::string fname;

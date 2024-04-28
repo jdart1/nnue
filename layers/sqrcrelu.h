@@ -1,18 +1,21 @@
-// Copyright 2022 by Jon Dart. All Rights Reserved
-#ifndef _NNUE_HALFKA_OUTPUT_H
-#define _NNUE_HALFKA_OUTPUT_H
+// Copyright 2022, 2024 by Jon Dart. All Rights Reserved
+#ifndef _NNUE_SQRCRELU_H
+#define _NNUE_SQRCRELU_H
 
 #include "typed.h"
 
-// Transform the accumulator into first layer output
+// Combination of the accumulator halves into a combined output, by:
+// 1. clamping to a range
+// 2. pairwise multiplication
+// 3. scaling the product
 template <typename InputType, typename AccumulatorType, typename OutputType, size_t size,
           unsigned clampMax, unsigned scaleFactor, size_t alignment = DEFAULT_ALIGN>
-class HalfKaOutput
+class SqrCRelU
     : public TypedLayer<InputType, OutputType, size, size, alignment> {
   public:
-    HalfKaOutput() = default;
+    SqrCRelU() = default;
 
-    virtual ~HalfKaOutput() = default;
+    virtual ~SqrCRelU() = default;
 
     virtual void doForward([[maybe_unused]] const InputType *input, [[maybe_unused]] OutputType *output) const noexcept {
         // no-op for this layer: use method below
@@ -21,8 +24,8 @@ class HalfKaOutput
 
     void postProcessAccum(const AccumulatorType &accum, OutputType *output) const {
 #if defined(SIMD)
-        simd::multAndSum<InputType,OutputType,size/2,clampMax,scaleFactor>(accum.getOutput(AccumulatorHalf::Lower),output);
-        simd::multAndSum<InputType,OutputType,size/2,clampMax,scaleFactor>(accum.getOutput(AccumulatorHalf::Upper),output + size/2);
+        simd::sqrCRelU<InputType,OutputType,size/2,clampMax,scaleFactor>(accum.getOutput(AccumulatorHalf::Lower),output);
+        simd::sqrCRelU<InputType,OutputType,size/2,clampMax,scaleFactor>(accum.getOutput(AccumulatorHalf::Upper),output + size/2);
 #else
         size_t offset = 0;
         static const AccumulatorHalf halves[2] = {AccumulatorHalf::Lower, AccumulatorHalf::Upper};

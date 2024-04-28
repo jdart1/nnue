@@ -1,26 +1,27 @@
 // Copyright 2021, 2022, 2024 by Jon Dart. All Rights Reserved
-#ifndef _NNUE_SCALE_CLAMP_H
-#define _NNUE_SCALE_CLAMP_H
+#ifndef _NNUE_CRELU_H
+#define _NNUE_CRELU_H
 
 #include "typed.h"
 
+// CRelU activation function with scaling of input
 template <typename InputType, typename OutputType, size_t size, unsigned scaleFactor,
           size_t alignment = DEFAULT_ALIGN>
-class ScaleAndClamp
+class CRelU
     : public TypedLayer<InputType, OutputType, size, size, alignment> {
 
 public:
     // scaleFactor is right shift, clampMax is upper limit for output
-    ScaleAndClamp(int clampMax)
+    CRelU(int clampMax)
         : _clampMax(clampMax) {
     }
 
-    virtual ~ScaleAndClamp() = default;
+    virtual ~CRelU() = default;
 
     virtual void doForward(const InputType *input, OutputType *output) const
         noexcept {
 #if defined(SIMD)
-        simd::scale_and_clamp<InputType, OutputType, size, scaleFactor>(input, output, _clampMax);
+        simd::CRelU<InputType, OutputType, size, scaleFactor>(input, output, _clampMax);
 #else
         for (size_t i = 0; i < size; i++) {
             output[i] = static_cast<OutputType>(
@@ -28,7 +29,7 @@ public:
         }
 #endif
 #ifdef NNUE_TRACE
-        std::cout << "---- scale/clamp ----" << std::endl;
+        std::cout << "---- CRelU ----" << std::endl;
         for (size_t i = 0; i < size; ++i) {
             std::cout << int(output[i]) << ' ';
         }

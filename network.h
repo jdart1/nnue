@@ -4,11 +4,10 @@
 
 #include "accumv2.h"
 #include "layers/base.h"
-#include "layers/clamp.h"
 #include "layers/halfkav2hm.h"
-#include "layers/halfka_output.h"
+#include "layers/sqrcrelu.h"
 #include "layers/linear.h"
-#include "layers/scaleclamp.h"
+#include "layers/crelu.h"
 #include "util.h"
 
 class Network {
@@ -25,25 +24,25 @@ public:
                               FeatureXformerOutputSize>;
     using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using HalfKaMultClamp = HalfKaOutput<AccumulatorOutputType, AccumulatorType, uint8_t, FeatureXformerOutputSize, 127, 7>;
+    using Layer1 = SqrCRelU<AccumulatorOutputType, AccumulatorType, uint8_t, FeatureXformerOutputSize, 127, 7>;
     using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, FeatureXformerOutputSize, 16>;
     using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 15, 32>;
     using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
-    using ScaleAndClamper1 = ScaleAndClamp<int32_t, uint8_t, 16, 6>;
-    using ScaleAndClamper2 = ScaleAndClamp<int32_t, uint8_t, 32, 6>;
+    using CRelU1 = CRelU<int32_t, uint8_t, 16, 6>;
+    using CRelU2 = CRelU<int32_t, uint8_t, 32, 6>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
-    Network() :  transformer(new FeatureXformer()), halfKaMultClamp(new HalfKaMultClamp()) {
+    Network() :  transformer(new FeatureXformer()), sqrCRelU(new Layer1()) {
         for (unsigned i = 0; i < PSQBuckets; ++i) {
             layers[i].push_back(new Layer2());
-            layers[i].push_back(new ScaleAndClamper1(127));
+            layers[i].push_back(new CRelU1(127));
             layers[i].push_back(new Layer3());
-            layers[i].push_back(new ScaleAndClamper2(127));
+            layers[i].push_back(new CRelU2(127));
             layers[i].push_back(new Layer4());
         }
 #ifndef NDEBUG
-        size_t bufferSize = halfKaMultClamp->getOutputSize();
+        size_t bufferSize = sqrCRelU->getOutputSize();
         for (const auto &layer : layers[0]) {
             bufferSize += layer->bufferSize();
         }
@@ -54,7 +53,7 @@ public:
 
     virtual ~Network() {
         delete transformer;
-        delete halfKaMultClamp;
+        delete sqrCRelU;
         for (unsigned i = 0; i < PSQBuckets; ++i) {
             for (auto layer : layers[i]) {
                 delete layer;
@@ -83,9 +82,8 @@ public:
         std::cout << accum << std::endl;
 #endif
         // post-process accumulator
-        halfKaMultClamp->postProcessAccum(accum,
-                                          reinterpret_cast<uint8_t*>(buffer));
-        size_t inputOffset = 0, outputOffset = halfKaMultClamp->getOutputSize(), lastOffset = 0;
+        sqrCRelU->postProcessAccum(accum, reinterpret_cast<uint8_t *>(buffer));
+        size_t inputOffset = 0, outputOffset = sqrCRelU->getOutputSize(), lastOffset = 0;
         // evaluate the remaining layers, in the correct bucket
         int layer = 0;
         int fwdOut = 0;
@@ -129,7 +127,7 @@ public:
 
 protected:
     FeatureXformer *transformer;
-    HalfKaMultClamp *halfKaMultClamp;
+    Layer1 *sqrCRelU;
     std::vector<BaseLayer *> layers[PSQBuckets];
 };
 
