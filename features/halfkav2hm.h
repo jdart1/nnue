@@ -76,11 +76,6 @@ public:
         }
     }
 
-    virtual inline void doForward(const InputType *, OutputType *) const noexcept {
-        // no-op for this layer: use updateAccum
-        assert(0);
-    }
-
     // read weights from a stream
     virtual std::istream &read(std::istream &s) {
         // read hash
