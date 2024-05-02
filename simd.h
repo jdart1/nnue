@@ -758,7 +758,7 @@ inline void clamp(const InType *in, OutType *out, [[maybe_unused]] InType clampM
 }
 
 template <typename InType, typename OutType, size_t size, unsigned rshift>
-inline void CRelU(const InType *in, OutType *out, [[maybe_unused]] InType clampMax) {
+inline void CReLU(const InType *in, OutType *out, [[maybe_unused]] InType clampMax) {
     static_assert(sizeof(InType) == 4 && sizeof(OutType) == 1,
                   "conditions not met for SIMD CRelU implementation");
 #ifdef NEON

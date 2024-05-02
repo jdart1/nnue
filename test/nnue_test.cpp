@@ -12,7 +12,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "../interface/chessint.h"
+#include "nnue.h"
+#include "features/halfkav2hm.h"
 
 // Unit tests for nnue code
 
@@ -329,7 +330,7 @@ static int test_halfkp() {
     }
 
     // test 1st layer output transformer
-    nnue::SqrCRelU<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
+    nnue::SqrCReLU<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
 
 #ifdef AVX52
     alignas(64) uint8_t out[HalfKaV2Hm::OutputSize];
@@ -345,7 +346,7 @@ static int test_halfkp() {
         if (out[i] != expected2[i]) ++errs;
     }
     if (errs != tmp_err) {
-        std::cerr << "errors in layer 2: SqrCRelU" << std::endl;
+        std::cerr << "errors in layer 2: SqrCReLU" << std::endl;
     }
 
     return errs;
@@ -547,18 +548,18 @@ static int test_incremental() {
 }
 
 template<size_t size>
-static int test_CRelU() {
+static int test_CReLU() {
     int errs = 0;
     constexpr int CLAMP_MAX = 127;
     constexpr int RSHIFT = 6;
     using InputType = int32_t;
     using OutputType = uint8_t;
-    using CRelU = nnue::CRelU<InputType, OutputType, size, RSHIFT>;
+    using CReLU = nnue::CReLU<InputType, OutputType, size, RSHIFT>;
 
     alignas(nnue::DEFAULT_ALIGN) InputType input[size];
     alignas(nnue::DEFAULT_ALIGN) OutputType output[size],output2[size];
 
-    CRelU c(CLAMP_MAX);
+    CReLU c(CLAMP_MAX);
 
     for (unsigned i = 0; i < size; i++) {
         input[i] = -9000 + 900*std::min<unsigned>(i,10) + i;
@@ -583,8 +584,8 @@ int main(int argc, char **argv) {
     errs += test_linear<32,1>();
     errs += test_halfkp();
     errs += test_incremental();
-    errs += test_CRelU<16>();
-    errs += test_CRelU<32>();
+    errs += test_CReLU<16>();
+    errs += test_CReLU<32>();
     std::cerr << errs << " errors" << std::endl;
 
     std::string fname;

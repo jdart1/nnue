@@ -2,46 +2,39 @@
 #ifndef _NNUE_NETWORK_H
 #define _NNUE_NETWORK_H
 
-#include "accumv2.h"
-#include "features/halfkav2hm.h"
-#include "layers/sqrcrelu.h"
+#include "accum.h"
+#include "features/arasanv3.h"
 #include "layers/linear.h"
-#include "layers/crelu.h"
+#include "layers/sqrcrelu.h"
 #include "util.h"
 
 class Network {
 
     template <typename ChessInterface> friend class Evaluator;
 
-public:
+  public:
     static constexpr size_t FeatureXformerOutputSize = 1024;
 
-    static constexpr size_t FeatureXformerRows = 22 * FeatureXformerOutputSize;
+    static constexpr size_t FeatureXformerRows = 12 * KingBuckets * 64;
 
     using OutputType = int32_t;
-    using FeatureXformer = HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, FeatureXformerRows,
-                              FeatureXformerOutputSize>;
+    using FeatureXformer = ArasanV3Feature<uint16_t, int16_t, int16_t, int16_t, FeatureXformerRows,
+                                           FeatureXformerOutputSize>;
     using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using Layer1 = SqrCRelU<AccumulatorOutputType, AccumulatorType, uint8_t, FeatureXformerOutputSize, 127, 7>;
-    using Layer2 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, FeatureXformerOutputSize, 16>;
-    using Layer3 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 15, 32>;
-    using Layer4 = LinearLayer<uint8_t, int8_t, int32_t, int32_t, 32, 1>;
-    using CRelU1 = CRelU<int32_t, uint8_t, 16, 6>;
-    using CRelU2 = CRelU<int32_t, uint8_t, 32, 6>;
+    using Layer1 = SqrCReLU<AccumulatorOutputType, AccumulatorType, uint16_t,
+                            FeatureXformerOutputSize, 255, 7>;
+    using Layer2 = LinearLayer<uint16_t, int16_t, int16_t, OutputType, FeatureXformerOutputSize, 1>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
-    Network() :  transformer(new FeatureXformer()), sqrCRelU(new Layer1()) {
-        for (unsigned i = 0; i < PSQBuckets; ++i) {
+    Network() : transformer(new FeatureXformer()), sqrCReLU(new Layer1()) {
+        for (unsigned i = 0; i < OutputBuckets; ++i) {
+            // only one output layer
             layers[i].push_back(new Layer2());
-            layers[i].push_back(new CRelU1(127));
-            layers[i].push_back(new Layer3());
-            layers[i].push_back(new CRelU2(127));
-            layers[i].push_back(new Layer4());
         }
 #ifndef NDEBUG
-        size_t bufferSize = sqrCRelU->getOutputSize();
+        size_t bufferSize = sqrCReLU->getOutputSize();
         for (const auto &layer : layers[0]) {
             bufferSize += layer->bufferSize();
         }
@@ -52,16 +45,15 @@ public:
 
     virtual ~Network() {
         delete transformer;
-        delete sqrCRelU;
-        for (unsigned i = 0; i < PSQBuckets; ++i) {
+        delete sqrCReLU;
+        for (size_t i = 0; i < OutputBuckets; ++i) {
             for (auto layer : layers[i]) {
                 delete layer;
             }
         }
     }
 
-    template <Color kside>
-    inline static unsigned getIndex(Square kp, Piece p, Square sq) {
+    template <Color kside> inline static unsigned getIndex(Square kp, Piece p, Square sq) {
 #ifdef NDEBUG
         return FeatureXformer::getIndex<kside>(kp, p, sq);
 #else
@@ -80,57 +72,49 @@ public:
         std::cout << "accumulator:" << std::endl;
         std::cout << accum << std::endl;
 #endif
-        // post-process accumulator
-        sqrCRelU->postProcessAccum(accum, reinterpret_cast<uint8_t *>(buffer));
-        size_t inputOffset = 0, outputOffset = sqrCRelU->getOutputSize(), lastOffset = 0;
+        sqrCReLU->postProcessAccum(accum, reinterpret_cast<AccumulatorOutputType *>(buffer));
+        size_t inputOffset = 0, outputOffset = sqrCReLU->getOutputSize(), lastOffset = 0;
         // evaluate the remaining layers, in the correct bucket
-        int layer = 0;
-        int fwdOut = 0;
         for (const auto &it : layers[bucket]) {
             it->forward(static_cast<const void *>(buffer + inputOffset),
                         static_cast<void *>(buffer + outputOffset));
-            if (layer == 0) {
-                // the last column of this layer's output is "fed foward"
-                fwdOut = reinterpret_cast<int32_t *>(buffer + outputOffset)[15];
-            }
             inputOffset = lastOffset = outputOffset;
             outputOffset += it->bufferSize();
-            ++layer;
         }
         int nnOut = reinterpret_cast<int32_t *>(buffer + lastOffset)[0];
-        int fwdOutScaled = int(fwdOut * (600 * FV_SCALE) / (127 * (1 << WEIGHT_SCALE_BITS)));
-        int psqVal = accum.getPSQValue(bucket);
 #ifdef NNUE_TRACE
-        std::cout << "NN output: " << nnOut << " fwdOut (pre-scaling) = " << fwdOut << 
-            " fwdOut (scaled): " << fwdOutScaled << " psq = " << psqVal << " total:" <<
-            (nnOut + fwdOutScaled + psqVal) / FV_SCALE << std::endl;
+        std::cout << "NN output, pre-scaling: " << nnOut << " scaled: " << nnOut / FVSCALE
+                  << std::endl;
 #endif
-       return (nnOut + fwdOutScaled + psqVal) / FV_SCALE;
+        return nnOut / FV_SCALE;
     }
 
     friend std::istream &operator>>(std::istream &i, Network &);
 
     // Perform an incremental update
     void updateAccum(const AccumulatorType &source, AccumulatorHalf sourceHalf,
-                     AccumulatorType &target, AccumulatorHalf targetHalf, 
-                     const IndexArray &added, size_t added_count, const IndexArray &removed,
+                     AccumulatorType &target, AccumulatorHalf targetHalf, const IndexArray &added,
+                     size_t added_count, const IndexArray &removed,
                      size_t removed_count) const noexcept {
-        transformer->updateAccum(source, sourceHalf, target, targetHalf, added, added_count, removed, removed_count);
+        transformer->updateAccum(source, sourceHalf, target, targetHalf, added, added_count,
+                                 removed, removed_count);
     }
 
     // Propagate data through the layer, updating the specified half of the
     // accumulator (side to move goes in lower half).
-    void updateAccum(const IndexArray &indices, AccumulatorHalf half, AccumulatorType &output) const noexcept {
+    void updateAccum(const IndexArray &indices, AccumulatorHalf half,
+                     AccumulatorType &output) const noexcept {
         transformer->updateAccum(indices, half, output);
     }
 
-protected:
+  protected:
     FeatureXformer *transformer;
-    Layer1 *sqrCRelU;
-    std::vector<BaseLayer *> layers[PSQBuckets];
+    Layer1 *sqrCReLU;
+    std::vector<BaseLayer *> layers[OutputBuckets];
 };
 
 inline std::istream &operator>>(std::istream &s, Network &network) {
+#ifdef STOCKFISH_FORMAT
     std::uint32_t version, size;
     version = read_little_endian<uint32_t>(s);
     // TBD: validate hash
@@ -138,10 +122,8 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
     size = read_little_endian<uint32_t>(s); // size of
                                             // architecture string
     if (!s.good()) {
-        std::cerr << "failed to read network file header" << std::endl;
         return s;
     } else if (version != NN_VERSION) {
-        std::cerr << "invalid network file version" << std::endl;
         s.setstate(std::ios::failbit);
         return s;
     }
@@ -150,12 +132,15 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
         if (!s.get(c))
             break;
     }
-    // read transform layer
+#endif
+    // read feature layer
     (void)network.transformer->read(s);
     // read num buckets x layers
-    for (unsigned i = 0; i < PSQBuckets; ++i) {
+    for (unsigned i = 0; i < OutputBuckets; ++i) {
+#ifdef STOCKFISH_FORMAT
         // skip next 4 bytes (hash)
         (void)read_little_endian<uint32_t>(s);
+#endif
         unsigned n = 0;
         for (auto layer : network.layers[i]) {
             if (!s.good())
@@ -164,8 +149,8 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
             ++n;
         }
         if (n != network.layers[i].size()) {
-            std::cerr << "network file read incomplete" << std::endl;
             s.setstate(std::ios::failbit);
+            break;
         }
     }
     return s;

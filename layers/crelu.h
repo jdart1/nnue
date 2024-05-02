@@ -4,19 +4,19 @@
 
 #include "typed.h"
 
-// CRelU activation function with scaling of input
+// CReLU activation function with scaling of input
 template <typename InputType, typename OutputType, size_t size, unsigned scaleFactor,
           size_t alignment = DEFAULT_ALIGN>
-class CRelU
+class CReLU
     : public TypedLayer<InputType, OutputType, size, size, alignment> {
 
 public:
     // scaleFactor is right shift, clampMax is upper limit for output
-    CRelU(int clampMax)
+    CReLU(int clampMax)
         : _clampMax(clampMax) {
     }
 
-    virtual ~CRelU() = default;
+    virtual ~CReLU() = default;
 
     virtual void doForward(const InputType *input, OutputType *output) const
         noexcept {

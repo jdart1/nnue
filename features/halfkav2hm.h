@@ -129,8 +129,8 @@ private:
     }
 
     static constexpr unsigned map[16][2] = {
-        {0, 0}, {0, 1}, {2, 3}, {4, 5}, {6, 7}, {8, 9}, {10, 10}, {0, 0},
-        {0, 0}, {1, 0}, {3, 2}, {5, 4}, {7, 6}, {9, 8}, {10, 10}, {0, 0}};
+        {0, 0}, {0, 1}, {2, 3}, {4, 5}, {6, 7}, {8, 9}, {10, 11}, {0, 0},
+        {0, 0}, {1, 0}, {3, 2}, {5, 4}, {7, 6}, {9, 8}, {11, 10}, {0, 0}};
 
     alignas(alignment) BiasType _biases[outputSize];
     alignas(alignment) WeightType _weights[inputSize][outputSize];

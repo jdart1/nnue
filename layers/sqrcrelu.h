@@ -10,12 +10,12 @@
 // 3. scaling the product
 template <typename InputType, typename AccumulatorType, typename OutputType, size_t size,
           unsigned clampMax, unsigned scaleFactor, size_t alignment = DEFAULT_ALIGN>
-class SqrCRelU
+class SqrCReLU
     : public TypedLayer<InputType, OutputType, size, size, alignment> {
   public:
-    SqrCRelU() = default;
+    SqrCReLU() = default;
 
-    virtual ~SqrCRelU() = default;
+    virtual ~SqrCReLU() = default;
 
     virtual void doForward([[maybe_unused]] const InputType *input, [[maybe_unused]] OutputType *output) const noexcept {
         // no-op for this layer: use method below

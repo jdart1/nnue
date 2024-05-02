@@ -26,6 +26,8 @@ enum Piece {
   BlackKing = 14
 };
 
+enum Files {A_FILE, B_FILE, C_FILE, D_FILE, E_FILE, F_FILE, G_FILE, H_FILE};
+
 static inline bool isKing(Piece p) {return p == WhiteKing || p == BlackKing;}
 
 enum class MoveType {Normal, Castling, Promotion};
