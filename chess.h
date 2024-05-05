@@ -32,7 +32,12 @@ static inline bool isKing(Piece p) {return p == WhiteKing || p == BlackKing;}
 
 enum class MoveType {Normal, Castling, Promotion};
 
-// foward declaration - may be defined with typedef
-//class Position;
+static inline Color colorOfPiece(Piece p) {
+    return static_cast<Color>(static_cast<int>(p)/8);
+}
+
+static inline int typeOfPiece(Piece p) {
+    return static_cast<int>(p) % 8;
+}
 
 #endif

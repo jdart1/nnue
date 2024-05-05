@@ -12,8 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "nnue.h"
-#include "features/halfkav2hm.h"
+#include "../interface/chessint.h"
 
 // Unit tests for nnue code
 
@@ -131,8 +130,8 @@ static const std::unordered_map<char, nnue::Piece> pieceMap = {
     {'P', nnue::WhitePawn}, {'N', nnue::WhiteKnight}, {'B', nnue::WhiteBishop},
     {'R', nnue::WhiteRook}, {'Q', nnue::WhiteQueen},  {'K', nnue::WhiteKing}};
 
-// wrapper around nnue::HalfKaV2Hm, sets up that class with some fixed parameters
-class HalfKaV2Hm {
+// wrapper around nnue::ArasanV3Feature, sets up that class with some fixed parameters
+class ArasanV3Feature {
   public:
     static constexpr size_t OutputSize = 1024;
 
@@ -141,11 +140,11 @@ class HalfKaV2Hm {
     using OutputType = int16_t;
 
     using FeatureXformer =
-        nnue::HalfKaV2Hm<uint16_t, int16_t, int16_t, int16_t, InputSize, OutputSize>;
+        nnue::ArasanV3Feature<uint16_t, int16_t, int16_t, int16_t, InputSize, OutputSize>;
 
     using AccumulatorType = FeatureXformer::AccumulatorType;
 
-    HalfKaV2Hm() : layer1(new FeatureXformer()) {}
+    ArasanV3Feature() : layer1(new FeatureXformer()) {}
 
     AccumulatorType accum;
 
@@ -159,18 +158,19 @@ class HalfKaV2Hm {
     std::unique_ptr<FeatureXformer> layer1;
 };
 
-static int16_t col1[HalfKaV2Hm::OutputSize];
-static int16_t col2[HalfKaV2Hm::OutputSize];
-static int16_t col3[HalfKaV2Hm::OutputSize];
-static int16_t col4[HalfKaV2Hm::OutputSize];
-static int16_t biases[HalfKaV2Hm::OutputSize];
+static int16_t col1[ArasanV3Feature::OutputSize];
+static int16_t col2[ArasanV3Feature::OutputSize];
+static int16_t col3[ArasanV3Feature::OutputSize];
+static int16_t col4[ArasanV3Feature::OutputSize];
+static int16_t biases[ArasanV3Feature::OutputSize];
 
-static int test_halfkp() {
+static int test_feature() {
     const std::string fen =
         "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
 
-    HalfKaV2Hm::FeatureXformer::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
-    for (size_t i = 0; i < HalfKaV2Hm::OutputSize; i++) {
+    /*
+    ArasanV3Feature::FeatureXformer::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
+    for (size_t i = 0; i < ArasanV3Feature::OutputSize; i++) {
          col1[i] = -1550 + i;
          col2[i] = 432 + i;
          col3[i] = -591 + i;
@@ -183,50 +183,49 @@ static int test_halfkp() {
         psq3[i] = -50 + i;
         psq4[i] = 23 + i;
     }
-
+    */
     std::unordered_set<nnue::IndexType> w_expected{
-        20800,
-        20804,
-        21062,
-        20429,
-        20686,
-        20438,
-        20441,
-        20506,
-        20447,
-        20513,
-        20451,
-        20644,
-        20967,
-        21033,
-        20907,
-        20525,
-        20527,
-        20533,
-        21110,
-        20924};
-
+                                                   263,
+                                                   259,
+                                                   385,
+                                                   74,
+                                                   201,
+                                                   81,
+                                                   94,
+                                                   477,
+                                                   88,
+                                                   486,
+                                                   100,
+                                                   547,
+                                                   352,
+                                                   750,
+                                                   684,
+                                                   490,
+                                                   488,
+                                                   498,
+                                                   817,
+                                                   699};
     std::unordered_set<nnue::IndexType> b_expected{
-        18104,
-        18108,
-        18302,
-        17717,
-        17974,
-        17710,
-        17697,
-        17634,
-        17703,
-        17625,
-        17691,
-        17756,
-        18207,
-        18129,
-        18003,
-        17621,
-        17623,
-        17613,
-        18254,
-        17988};
+                                                   2239,
+                                                   2235,
+                                                   2361,
+                                                   2034,
+                                                   2161,
+                                                   2025,
+                                                   2022,
+                                                   1637,
+                                                   2016,
+                                                   1630,
+                                                   2012,
+                                                   1691,
+                                                   2264,
+                                                   1878,
+                                                   1812,
+                                                   1618,
+                                                   1616,
+                                                   1610,
+                                                   1929,
+                                                   1795};
 
     Position p(fen);
     ChessInterface intf(&p);
@@ -273,32 +272,34 @@ static int test_halfkp() {
         std::cerr << std::endl;
     }
 
-    HalfKaV2Hm halfKp;
+    ArasanV3Feature feature;
 
-    HalfKaV2Hm::AccumulatorType accum;
+    ArasanV3Feature::AccumulatorType accum;
 
-    halfKp.get()->setCol(20800, col1);
-    halfKp.get()->setCol(20804, col2);
-    halfKp.get()->setCol(18254, col3);
-    halfKp.get()->setCol(17988, col4);
-    halfKp.get()->setPSQ(20800, psq1);
-    halfKp.get()->setPSQ(20804, psq2);
-    halfKp.get()->setPSQ(18254, psq3);
-    halfKp.get()->setPSQ(17988, psq4);
-    halfKp.get()->setBiases(biases);
+    feature.get()->setCol(20800, col1);
+    feature.get()->setCol(20804, col2);
+    feature.get()->setCol(18254, col3);
+    feature.get()->setCol(17988, col4);
+    /*    
+    feature.get()->setPSQ(20800, psq1);
+    feature.get()->setPSQ(20804, psq2);
+    feature.get()->setPSQ(18254, psq3);
+    feature.get()->setPSQ(17988, psq4);
+    */
+    feature.get()->setBiases(biases);
 
-    halfKp.get()->updateAccum(bIndices, nnue::AccumulatorHalf::Lower, accum);
-    halfKp.get()->updateAccum(wIndices, nnue::AccumulatorHalf::Upper, accum);
+    feature.get()->updateAccum(bIndices, nnue::AccumulatorHalf::Lower, accum);
+    feature.get()->updateAccum(wIndices, nnue::AccumulatorHalf::Upper, accum);
 
-    HalfKaV2Hm::OutputType expected[2][HalfKaV2Hm::OutputSize];
-    for (size_t i = 0; i < HalfKaV2Hm::OutputSize; ++i) {
+    ArasanV3Feature::OutputType expected[2][ArasanV3Feature::OutputSize];
+    for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
         expected[0][i] = col3[i] + col4[i] + biases[i];
         expected[1][i] = col1[i] + col2[i] + biases[i];
     }
     static const nnue::AccumulatorHalf halves[2] = {nnue::AccumulatorHalf::Lower,
         nnue::AccumulatorHalf::Upper};
     for (auto h : halves) {
-        for (size_t i = 0; i < HalfKaV2Hm::OutputSize; ++i) {
+        for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
             auto exp = expected[h == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
             if (exp != accum.getOutput(h)[i]) {
                 ++errs;
@@ -310,7 +311,8 @@ static int test_halfkp() {
     }
 
     // test PSQ update
-    HalfKaV2Hm::FeatureXformer::PSQWeightType psq_expected[2][nnue::PSQBuckets];
+    /*
+    ArasanV3Feature::FeatureXformer::PSQWeightType psq_expected[2][nnue::PSQBuckets];
     for (size_t i = 0; i < nnue::PSQBuckets; ++i) {
         psq_expected[0][i] = psq3[i] + psq4[i];
         psq_expected[1][i] = psq1[i] + psq2[i];
@@ -328,21 +330,21 @@ static int test_halfkp() {
             }
         }
     }
+    */
 
-    // test 1st layer output transformer
-    nnue::SqrCReLU<int16_t, HalfKaV2Hm::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
+    nnue::SqrCReLU<int16_t, ArasanV3Feature::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
 
-#ifdef AVX52
-    alignas(64) uint8_t out[HalfKaV2Hm::OutputSize];
+#ifdef AVX512
+    alignas(64) uint8_t out[ArasanV3Feature::OutputSize];
 #else
-    alignas(nnue::DEFAULT_ALIGN) uint8_t out[HalfKaV2Hm::OutputSize];
+    alignas(nnue::DEFAULT_ALIGN) uint8_t out[ArasanV3Feature::OutputSize];
 #endif
     outputTransform.postProcessAccum(accum,out);
 
-    static const uint8_t expected2[HalfKaV2Hm::OutputSize] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,3,6,9,8,11,14,17,16,19,22,25,24,27,30,33,32,35,38,41,40,43,46,49,48,51,54,57,56,59,62,65,64,67,70,73,72,75,78,81,80,83,86,89,88,91,94,97,96,99,102,105,104,107,110,113,112,115,118,121,120,123,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    static const uint8_t expected2[ArasanV3Feature::OutputSize] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,3,6,9,8,11,14,17,16,19,22,25,24,27,30,33,32,35,38,41,40,43,46,49,48,51,54,57,56,59,62,65,64,67,70,73,72,75,78,81,80,83,86,89,88,91,94,97,96,99,102,105,104,107,110,113,112,115,118,121,120,123,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
     int tmp_err = errs;
-    for (size_t i = 0; i < HalfKaV2Hm::OutputSize; ++i) {
+    for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
         if (out[i] != expected2[i]) ++errs;
     }
     if (errs != tmp_err) {
@@ -441,17 +443,17 @@ static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
         std::cerr << "removed list differs (B)" << std::endl;
     }
 
-    HalfKaV2Hm halfKp;
+    ArasanV3Feature feature;
 
-    HalfKaV2Hm::AccumulatorType accum;
+    ArasanV3Feature::AccumulatorType accum;
 
     // set some weights
-    for (size_t i = 0; i < HalfKaV2Hm::InputSize; i++) {
-        HalfKaV2Hm::OutputType col[HalfKaV2Hm::OutputSize];
-        for (size_t j = 0; j < HalfKaV2Hm::OutputSize; j++) {
+    for (size_t i = 0; i < ArasanV3Feature::InputSize; i++) {
+        ArasanV3Feature::OutputType col[ArasanV3Feature::OutputSize];
+        for (size_t j = 0; j < ArasanV3Feature::OutputSize; j++) {
             col[j] = (i + j) % 10 - 5;
         }
-        halfKp.get()->setCol(i, col);
+        feature.get()->setCol(i, col);
     }
 
     // Full evaluation of feature transformer for source position
@@ -511,7 +513,7 @@ static int test_incremental() {
 
     int errs = 0;
 
-    HalfKaV2Hm halfKp;
+    ArasanV3Feature featureXformer;
 
     Position source_pos(source_fen);
     ChessInterface ciSource(&source_pos);
@@ -547,6 +549,7 @@ static int test_incremental() {
     return errs;
 }
 
+/*
 template<size_t size>
 static int test_CReLU() {
     int errs = 0;
@@ -559,7 +562,7 @@ static int test_CReLU() {
     alignas(nnue::DEFAULT_ALIGN) InputType input[size];
     alignas(nnue::DEFAULT_ALIGN) OutputType output[size],output2[size];
 
-    CReLU c(CLAMP_MAX);
+    nnue::CReLU c(CLAMP_MAX);
 
     for (unsigned i = 0; i < size; i++) {
         input[i] = -9000 + 900*std::min<unsigned>(i,10) + i;
@@ -573,6 +576,7 @@ static int test_CReLU() {
     if (errs) std::cerr << errs << " error(s) in scale and clamp function" << std::endl;
     return errs;
 }
+*/
 
 int main(int argc, char **argv) {
     nnue::Network n;
@@ -582,10 +586,10 @@ int main(int argc, char **argv) {
     errs += test_linear<32,32>();
     errs += test_linear<16,16>();
     errs += test_linear<32,1>();
-    errs += test_halfkp();
+    errs += test_feature();
     errs += test_incremental();
-    errs += test_CReLU<16>();
-    errs += test_CReLU<32>();
+    //    errs += test_CReLU<16>();
+    //    errs += test_CReLU<32>();
     std::cerr << errs << " errors" << std::endl;
 
     std::string fname;

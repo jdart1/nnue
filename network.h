@@ -22,7 +22,7 @@ class Network {
                                            FeatureXformerOutputSize>;
     using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using Layer1 = SqrCReLU<AccumulatorOutputType, AccumulatorType, uint16_t,
+    using Layer1 = SqrCReLU<AccumulatorOutputType, AccumulatorType, int16_t,
                             FeatureXformerOutputSize, 255, 7>;
     using Layer2 = LinearLayer<uint16_t, int16_t, int16_t, OutputType, FeatureXformerOutputSize, 1>;
 

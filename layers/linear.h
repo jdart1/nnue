@@ -32,9 +32,9 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
 
     inline void dotProduct(const InputType *input, OutputType *output) const noexcept {
 #if defined(SIMD)
-        if constexpr (outputSize == 1) { // output layer
+        if constexpr (outputSize == 1 && sizeof(WeightType) == 1) { // output layer
             simd::dotProduct32x1(input, _weights[0], _biases, output);
-        } else if constexpr (inputSize >= 32) {
+        } else if constexpr (inputSize >= 32 && sizeof(WeightType) == 1) {
             simd::dotProductnxn<inputSize, roundedInputSize, outputSize>(input, _weights, _biases,
                                                                          output);
         } else
@@ -96,7 +96,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
             _weights[index][i] = col[i];
     }
 
-  private:
+protected:
     alignas(alignment) BiasType _biases[outputSize];
     alignas(alignment) WeightType _weights[outputSize][roundedInputSize];
 };

@@ -24,32 +24,38 @@ class SqrCReLU
 
     void postProcessAccum(const AccumulatorType &accum, OutputType *output) const {
 #if defined(SIMD)
-        simd::sqrCRelU<InputType,OutputType,size/2,clampMax,scaleFactor>(accum.getOutput(AccumulatorHalf::Lower),output);
-        simd::sqrCRelU<InputType,OutputType,size/2,clampMax,scaleFactor>(accum.getOutput(AccumulatorHalf::Upper),output + size/2);
-#else
-        size_t offset = 0;
-        static const AccumulatorHalf halves[2] = {AccumulatorHalf::Lower, AccumulatorHalf::Upper};
-        for (size_t p = 0; p < 2; ++p, offset += size/2) {
-            const InputType *input = accum.getOutput(halves[p]);
-            for (size_t i = 0; i < size/2; ++i) {
-                InputType sum0 = input[i];
-                InputType sum1 = input[i + size/2];
-                sum0 = std::clamp<int>(sum0, 0, clampMax);
-                sum1 = std::clamp<int>(sum1, 0, clampMax);
-                output[offset + i] = static_cast<OutputType>((sum0 * sum1) >> scaleFactor);
+        if constexpr (sizeof(OutputType) == 1) {
+            simd::sqrCRelU<InputType, OutputType, size / 2, clampMax, scaleFactor>(
+                accum.getOutput(AccumulatorHalf::Lower), output);
+            simd::sqrCRelU<InputType, OutputType, size / 2, clampMax, scaleFactor>(
+                accum.getOutput(AccumulatorHalf::Upper), output + size / 2);
+        } else
+#endif
+        {
+            size_t offset = 0;
+            static const AccumulatorHalf halves[2] = {AccumulatorHalf::Lower,
+                                                      AccumulatorHalf::Upper};
+            for (size_t p = 0; p < 2; ++p, offset += size / 2) {
+                const InputType *input = accum.getOutput(halves[p]);
+                for (size_t i = 0; i < size / 2; ++i) {
+                    InputType sum0 = input[i];
+                    InputType sum1 = input[i + size / 2];
+                    sum0 = std::clamp<int>(sum0, 0, clampMax);
+                    sum1 = std::clamp<int>(sum1, 0, clampMax);
+                    output[offset + i] = static_cast<OutputType>((sum0 * sum1) >> scaleFactor);
+                }
             }
         }
-#endif
 #ifdef NNUE_TRACE
-        std::cout << "---- halfka_output " << std::endl;
+            std::cout << "---- halfka_output " << std::endl;
         for (size_t i = 0; i < size; ++i) {
             std::cout << int(output[i]) << ' ';
-            if ((i+1) % 64 == 0) std::cout << std::endl;
+            if ((i + 1) % 64 == 0)
+                std::cout << std::endl;
         }
         std::cout << std::endl;
 #endif
     }
-
 };
 
 #endif
