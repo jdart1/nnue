@@ -648,7 +648,7 @@ void update(const AccumType *source, AccumType *target,
     constexpr size_t iterations = registerWidths / regCount;
     constexpr size_t remaining = registerWidths % regCount;
     if constexpr (iterations > 0) {
-        if constexpr (sizeof(AccumType)==2) 
+        if constexpr (sizeof(AccumType)==2)
             updateLoopNeon<vec16_t, AccumType, WeightType, inputSize, outputSize, regCount, simdWidth,
                        iterations, SimdOperationsNeon<vec16_t, AccumType, sizeof(AccumType)>>(
             source, target, weights, added, added_count, removed, removed_count, offset);
@@ -893,6 +893,10 @@ static inline void sqrCRelU(const InType *input, OutType *output) {
     }
 #endif
 }
+
+// Combination of piece-wise multitplication with CRelU activation and a linear layer with 1-dimensional output.
+// Operations are re-arranged as suggested here: https://github.com/cosmobobak/viridithas/blob/master/nnue-speedups.md#lizard-simd-for-squared-clipped-relu, allowing efficient SIMD execution with 16-bit quantities (originally implemented in LizardChess).
+
 
 } // namespace simd
 

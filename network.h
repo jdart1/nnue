@@ -5,7 +5,7 @@
 #include "accum.h"
 #include "features/arasanv3.h"
 #include "layers/linear.h"
-#include "layers/sqrcrelu.h"
+#include "layers/sqrcreluandlinear.h"
 #include "util.h"
 
 class Network {
@@ -22,34 +22,21 @@ class Network {
                                            FeatureXformerOutputSize>;
     using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using Layer1 = SqrCReLU<AccumulatorOutputType, AccumulatorType, int16_t,
-                            FeatureXformerOutputSize, 255, 7>;
-    using Layer2 = LinearLayer<uint16_t, int16_t, int16_t, OutputType, FeatureXformerOutputSize, 1>;
+    using OutputLayer = SqrCReLUAndLinear<int16_t, AccumulatorType, int16_t, int16_t, OutputType,
+                                          FeatureXformerOutputSize, 255>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
-    Network() : transformer(new FeatureXformer()), sqrCReLU(new Layer1()) {
-        for (unsigned i = 0; i < OutputBuckets; ++i) {
-            // only one output layer
-            layers[i].push_back(new Layer2());
+    Network() : transformer(new FeatureXformer()) {
+        for (size_t i = 0; i < OutputBuckets; ++i) {
+            outputLayer[i] = new OutputLayer();
         }
-#ifndef NDEBUG
-        size_t bufferSize = sqrCReLU->getOutputSize();
-        for (const auto &layer : layers[0]) {
-            bufferSize += layer->bufferSize();
-        }
-        // verify const buffer size is sufficient
-        assert(bufferSize <= BUFFER_SIZE);
-#endif
     }
 
     virtual ~Network() {
         delete transformer;
-        delete sqrCReLU;
         for (size_t i = 0; i < OutputBuckets; ++i) {
-            for (auto layer : layers[i]) {
-                delete layer;
-            }
+            delete outputLayer[i];
         }
     }
 
@@ -72,21 +59,15 @@ class Network {
         std::cout << "accumulator:" << std::endl;
         std::cout << accum << std::endl;
 #endif
-        sqrCReLU->postProcessAccum(accum, reinterpret_cast<AccumulatorOutputType *>(buffer));
-        size_t inputOffset = 0, outputOffset = sqrCReLU->getOutputSize(), lastOffset = 0;
-        // evaluate the remaining layers, in the correct bucket
-        for (const auto &it : layers[bucket]) {
-            it->forward(static_cast<const void *>(buffer + inputOffset),
-                        static_cast<void *>(buffer + outputOffset));
-            inputOffset = lastOffset = outputOffset;
-            outputOffset += it->bufferSize();
-        }
-        int nnOut = reinterpret_cast<int32_t *>(buffer + lastOffset)[0];
+        size_t lastOffset = 0;
+        // evaluate the output layer, in the correct bucket
+        outputLayer[bucket]->postProcessAccum(accum, reinterpret_cast<OutputType *>(buffer));
+        int32_t nnOut = reinterpret_cast<int32_t *>(buffer + lastOffset)[0];
 #ifdef NNUE_TRACE
         std::cout << "NN output, pre-scaling: " << nnOut << " scaled: " << nnOut / FVSCALE
                   << std::endl;
 #endif
-        return nnOut / FV_SCALE;
+        return (nnOut * NETWORK_SCALE) / (NETWORK_QA * NETWORK_QB);
     }
 
     friend std::istream &operator>>(std::istream &i, Network &);
@@ -109,8 +90,7 @@ class Network {
 
   protected:
     FeatureXformer *transformer;
-    Layer1 *sqrCReLU;
-    std::vector<BaseLayer *> layers[OutputBuckets];
+    OutputLayer *outputLayer[OutputBuckets];
 };
 
 inline std::istream &operator>>(std::istream &s, Network &network) {
@@ -136,22 +116,17 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
     // read feature layer
     (void)network.transformer->read(s);
     // read num buckets x layers
-    for (unsigned i = 0; i < OutputBuckets; ++i) {
+    unsigned n = 0;
+    for (size_t i = 0; i < OutputBuckets && s.good(); ++i) {
 #ifdef STOCKFISH_FORMAT
         // skip next 4 bytes (hash)
         (void)read_little_endian<uint32_t>(s);
 #endif
-        unsigned n = 0;
-        for (auto layer : network.layers[i]) {
-            if (!s.good())
-                break;
-            (void)layer->read(s);
-            ++n;
-        }
-        if (n != network.layers[i].size()) {
-            s.setstate(std::ios::failbit);
-            break;
-        }
+        network.outputLayer[i]->read(s);
+        ++n;
+    }
+    if (n != OutputBuckets) {
+        s.setstate(std::ios::failbit);
     }
     return s;
 }

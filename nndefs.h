@@ -21,10 +21,11 @@ using IndexType = unsigned;
 
 static constexpr IndexType LAST_INDEX = 1000000;
 
-// Ratio of NNUE output to chess evaluation
-static constexpr int FV_SCALE = 16;
+// Quantization factors
 
-static constexpr int WEIGHT_SCALE_BITS = 6;
+static constexpr int NETWORK_QA = 255;
+static constexpr int NETWORK_QB = 64;
+static constexpr int NETWORK_SCALE = 400;
 
 using IndexArray = std::array<IndexType,MAX_INDICES>;
 

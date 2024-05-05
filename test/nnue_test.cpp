@@ -276,10 +276,10 @@ static int test_feature() {
 
     ArasanV3Feature::AccumulatorType accum;
 
-    feature.get()->setCol(20800, col1);
-    feature.get()->setCol(20804, col2);
-    feature.get()->setCol(18254, col3);
-    feature.get()->setCol(17988, col4);
+    feature.get()->setCol(547, col1);
+    feature.get()->setCol(352, col2);
+    feature.get()->setCol(1878, col3);
+    feature.get()->setCol(1637, col4);
     /*    
     feature.get()->setPSQ(20800, psq1);
     feature.get()->setPSQ(20804, psq2);
@@ -330,7 +330,6 @@ static int test_feature() {
             }
         }
     }
-    */
 
     nnue::SqrCReLU<int16_t, ArasanV3Feature::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
 
@@ -350,7 +349,7 @@ static int test_feature() {
     if (errs != tmp_err) {
         std::cerr << "errors in layer 2: SqrCReLU" << std::endl;
     }
-
+    */
     return errs;
 }
 
