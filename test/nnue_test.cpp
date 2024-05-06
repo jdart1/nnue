@@ -614,14 +614,14 @@ int main(int argc, char **argv) {
         if (in.bad()) {
             std::cerr << "error loading " << fname << std::endl << std::flush;
         }
+        else {
+            const std::string fen =
+                "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
+            Position p(fen);
+            ChessInterface intf(&p);
+            int val = nnue::Evaluator<ChessInterface>::fullEvaluate(n,intf);
+            std::cout << "value=" << val << std::endl;
+        }
     }
-#ifdef NNUE_TRACE
-    const std::string fen =
-        "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
-    Position p(fen);
-    ChessInterface intf(&p);
-    nnue::Evaluator<ChessInterface>::fullEvaluate(n,intf);
-#endif
-
     return 0;
 }

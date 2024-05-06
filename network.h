@@ -64,8 +64,8 @@ class Network {
         outputLayer[bucket]->postProcessAccum(accum, reinterpret_cast<OutputType *>(buffer));
         int32_t nnOut = reinterpret_cast<int32_t *>(buffer + lastOffset)[0];
 #ifdef NNUE_TRACE
-        std::cout << "NN output, pre-scaling: " << nnOut << " scaled: " << nnOut / FVSCALE
-                  << std::endl;
+        std::cout << "NN output, pre-scaling: " << nnOut << " scaled: " <<
+            (nnOut * NETWORK_SCALE) / (NETWORK_QA * NETWORK_QB) << std::endl;
 #endif
         return (nnOut * NETWORK_SCALE) / (NETWORK_QA * NETWORK_QB);
     }
