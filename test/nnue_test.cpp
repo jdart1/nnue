@@ -168,8 +168,7 @@ static int test_feature() {
     const std::string fen =
         "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
 
-    /*
-    ArasanV3Feature::FeatureXformer::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
+    // ArasanV3Feature::FeatureXformer::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
     for (size_t i = 0; i < ArasanV3Feature::OutputSize; i++) {
          col1[i] = -1550 + i;
          col2[i] = 432 + i;
@@ -177,6 +176,7 @@ static int test_feature() {
          col4[i] = -240 + i;
          biases[i] = i % 4;
     }
+    /*
     for (size_t i = 0; i < nnue::PSQBuckets; i++) {
         psq1[i] = -200 + i;
         psq2[i] = 71 + i;
@@ -298,6 +298,7 @@ static int test_feature() {
     }
     static const nnue::AccumulatorHalf halves[2] = {nnue::AccumulatorHalf::Lower,
         nnue::AccumulatorHalf::Upper};
+    int half = 0;
     for (auto h : halves) {
         for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
             auto exp = expected[h == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
