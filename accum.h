@@ -28,6 +28,21 @@ class Accumulator {
         return c1 == c2 ? AccumulatorHalf::Lower : AccumulatorHalf::Upper;
     }
 
+    template <typename BiasType>
+    void init_half(AccumulatorHalf half, const BiasType *data) {
+        const OutputType *in = data;
+        OutputType *out = _accum[halfToIndex(half)];
+#ifdef SIMD
+        if constexpr ((size/2)*16 % simd::simdWidth == 0 && sizeof(BiasType) == sizeof(OutputType) && sizeof(OutputType)==2) {
+            simd::vec_copy<size/2,OutputType>(in,out);
+        }
+        else
+#endif
+        for (size_t i = 0; i < size / 2; ++i) {
+            *out++ = static_cast<OutputType>(*in++);
+        }
+    }
+
     void copy_half(AccumulatorHalf half,
                    const Accumulator<OutputType, size, alignment> &source,
                    AccumulatorHalf sourceHalf) {
@@ -37,7 +52,8 @@ class Accumulator {
     }
 
     // Update half of the accumulator (does not use SIMD)
-    void add_half(AccumulatorHalf half, const OutputType *data) {
+    template <typename WeightType>
+    void add_half(AccumulatorHalf half, const WeightType *data) {
         const OutputType *in = data;
         OutputType *out = _accum[halfToIndex(half)];
         for (size_t i = 0; i < size; ++i) {
@@ -46,7 +62,8 @@ class Accumulator {
     }
 
     // Update half of the accumulator (does not use SIMD)
-    void sub_half(AccumulatorHalf half, const OutputType *data) {
+    template <typename WeightType>
+    void sub_half(AccumulatorHalf half, const WeightType *data) {
         const OutputType *in = data;
         OutputType *out = _accum[halfToIndex(half)];
         for (size_t i = 0; i < size; ++i) {
