@@ -185,47 +185,47 @@ static int test_feature() {
     }
     */
     std::unordered_set<nnue::IndexType> w_expected{
-                                                   263,
-                                                   259,
-                                                   385,
-                                                   74,
-                                                   201,
-                                                   81,
-                                                   94,
-                                                   477,
-                                                   88,
-                                                   486,
-                                                   100,
-                                                   547,
-                                                   352,
-                                                   750,
-                                                   684,
-                                                   490,
-                                                   488,
-                                                   498,
-                                                   817,
-                                                   699};
+                                                   199,
+                                                   195,
+                                                   321,
+                                                   10,
+                                                   137,
+                                                   17,
+                                                   30,
+                                                   413,
+                                                   24,
+                                                   422,
+                                                   36,
+                                                   483,
+                                                   288,
+                                                   686,
+                                                   620,
+                                                   426,
+                                                   424,
+                                                   434,
+                                                   753,
+                                                   635};
     std::unordered_set<nnue::IndexType> b_expected{
-                                                   2239,
-                                                   2235,
-                                                   2361,
-                                                   2034,
-                                                   2161,
-                                                   2025,
-                                                   2022,
-                                                   1637,
-                                                   2016,
-                                                   1630,
-                                                   2012,
-                                                   1691,
-                                                   2264,
-                                                   1878,
-                                                   1812,
-                                                   1618,
-                                                   1616,
-                                                   1610,
-                                                   1929,
-                                                   1795};
+                                                   2175,
+                                                   2171,
+                                                   2297,
+                                                   1970,
+                                                   2097,
+                                                   1961,
+                                                   1958,
+                                                   1573,
+                                                   1952,
+                                                   1566,
+                                                   1948,
+                                                   1627,
+                                                   2200,
+                                                   1814,
+                                                   1748,
+                                                   1554,
+                                                   1552,
+                                                   1546,
+                                                   1865,
+                                                   1731};
 
     Position p(fen);
     ChessInterface intf(&p);
@@ -298,7 +298,6 @@ static int test_feature() {
     }
     static const nnue::AccumulatorHalf halves[2] = {nnue::AccumulatorHalf::Lower,
         nnue::AccumulatorHalf::Upper};
-    int half = 0;
     for (auto h : halves) {
         for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
             auto exp = expected[h == nnue::AccumulatorHalf::Lower ? 0 : 1][i];

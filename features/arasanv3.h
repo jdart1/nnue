@@ -46,6 +46,9 @@ public:
         //#else
         output.init_half(half,this->_biases);
         for (auto it = indices.begin(); it != indices.end() && *it != LAST_INDEX; ++it) {
+            std::cout << "index " << *it << " adding weights ";
+            for (size_t i = 0; i < 20; ++i) std::cout << this->_weights[*it][i] << ' ';
+            std::cout << "to side " << (half == AccumulatorHalf::Lower ? 0 : 1) << std::endl;
             output.add_half(half,this->_weights[*it]);
         }
         //#endif
@@ -97,21 +100,12 @@ public:
 #endif        
         // weights first
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
-            if (i == 0) std::cout << "first row" << std::endl;
-            if (i == 1) std::cout << "second row" << std::endl;
-            if (i == 400) std::cout << "row 400" << std::endl;
             for (size_t j = 0; j < outputSize && s.good(); ++j) {
                 _weights[i][j] = read_little_endian<WeightType>(s);
-                if ((i == 400 || i <= 1) && j < 20) {
-                    std::cout << int(_weights[i][j]) << ' ';
-                }
             }
-            if ((i == 400) || i <= 1) std::cout << std::endl;
         }
-        std::cout << "biases" << std::endl;
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
-            if (i < 20) std::cout << _biases[i] << ' ';
         }
         std::cout << std::endl;
 #endif
@@ -134,8 +128,8 @@ public:
 
 private:
     static constexpr unsigned pieceTypeMap[2][16] = {
-                                                     {0, 1, 2, 3, 4, 5, 6, 0, 0, 1, 2, 3, 4, 5, 6, 0},
-                                                     {0, 7, 8, 9, 10, 11, 12, 0, 0, 7, 8, 9, 10, 11, 12, 0}};
+                                                     {0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 0},
+                                                     {0, 6, 7, 8, 9, 10, 11, 0, 0, 6, 7, 8, 9, 10, 11, 0}};
 
     static constexpr unsigned kingBucketsMap[] = {
                                              0, 0, 1, 1, 1, 1, 0, 0,
