@@ -140,15 +140,15 @@ public:
         updateAccum(network, intf, accum);
 #ifdef NNUE_TRACE
         std::cout << "full evaluate" << std::endl;
-        std::cout << "bucket=" << getBucket(intf) << std::endl;
+        std::cout << "output bucket=" << getOutputBucket(intf) << std::endl;
         std::cout << accum << std::endl;
 #endif        
-        return network.evaluate(accum, getBucket(intf));
+        return network.evaluate(accum, getOutputBucket(intf));
     }
 
-    static unsigned getBucket(const ChessInterface &intf) {
-        // range is 0 .. 7
-        return (intf.pieceCount() - 1)/4;
+    static unsigned getOutputBucket(const ChessInterface &intf) {
+        // range is 0..7
+        return (intf.pieceCount() - 2)/4;
     }
 
 private:

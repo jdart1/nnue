@@ -83,7 +83,7 @@ public:
 
     // read weights from a stream
     virtual std::istream &read(std::istream &s) {
-#ifdef STOCKFISH_FORMAT        
+#ifdef STOCKFISH_FORMAT
         // read hash
         (void)read_little_endian<uint32_t>(s);
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
@@ -97,7 +97,7 @@ public:
 #else
 #ifdef NNUE_TRACE
         std::cout << "weights" << std::endl;
-#endif        
+#endif
         // weights first
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
             for (size_t j = 0; j < outputSize && s.good(); ++j) {
@@ -132,16 +132,16 @@ private:
                                                      {0, 6, 7, 8, 9, 10, 11, 0, 0, 6, 7, 8, 9, 10, 11, 0}};
 
     static constexpr unsigned kingBucketsMap[] = {
-                                             0, 0, 1, 1, 1, 1, 0, 0,
-                                             2, 2, 2, 2, 2, 2, 2, 2,
-                                             3, 3, 3, 3, 3, 3, 3, 3, 
-                                             3, 3, 3, 3, 3, 3, 3, 3, 
-                                             4, 4, 4, 4, 4, 4, 4, 4, 
-                                             4, 4, 4, 4, 4, 4, 4, 4, 
-                                             4, 4, 4, 4, 4, 4, 4, 4, 
-                                             4, 4, 4, 4, 4, 4, 4, 4
+                                                  0, 0, 1, 1, 1, 1, 0, 0,
+                                                  2, 2, 2, 2, 2, 2, 2, 2,
+                                                  3, 3, 3, 3, 3, 3, 3, 3,
+                                                  3, 3, 3, 3, 3, 3, 3, 3,
+                                                  4, 4, 4, 4, 4, 4, 4, 4,
+                                                  4, 4, 4, 4, 4, 4, 4, 4,
+                                                  4, 4, 4, 4, 4, 4, 4, 4,
+                                                  4, 4, 4, 4, 4, 4, 4, 4
     };
-    
+
     alignas(alignment) BiasType _biases[outputSize];
     alignas(alignment) WeightType _weights[inputSize][outputSize];
 

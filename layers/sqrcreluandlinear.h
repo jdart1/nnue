@@ -32,28 +32,45 @@ class SqrCReLUAndLinear
         {
             // generic implementation
             int sum = 0;
-            for (size_t i = 0; i < accum.getSize(); ++i) {
-                InputType x = accum.getOutput(AccumulatorHalf::Lower)[i];
-                InputType y = accum.getOutput(AccumulatorHalf::Upper)[i];
-                // CReLU
-                x = std::clamp<int>(x, 0, clampMax);
-                y = std::clamp<int>(y, 0, clampMax);
-                // pairwise product of the accumulator halves
-                int product = x * y;
-                // vector multiply and sum
-                sum += product * this->_weights[0][i];
+            static AccumulatorHalf halves[] = {AccumulatorHalf::Lower, AccumulatorHalf::Upper};
+            size_t offset = 0;
+#ifdef NNUE_TRACE
+            std::cout << "stm weights ";
+            for (size_t i = 0; i < 20; ++i) {
+                std::cout << this->_weights[0][i] << ' ';
+            }
+            std::cout << std::endl;
+            std::cout << "opp side weights ";
+            for (size_t i = 0; i < 20; ++i) {
+                std::cout << this->_weights[0][i + accum.getSize()] << ' ';
+            }
+            std::cout << std::endl;
+
+#endif
+            for (auto h : halves) {
+                for (size_t i = 0; i < accum.getSize(); ++i) {
+                    int16_t x = accum.getOutput(h)[i];
+                    // CReLU
+                    x = std::clamp<int16_t>(x, 0, clampMax);
+                    // multiply by weights and keep in 16-bit range
+                    int16_t product = (x * this->_weights[0][i + offset]) & 0xffff;
+                    // square and sum
+                    sum += product * x;
+                }
+                offset += accum.getSize();
             }
             output[0] = (sum / NETWORK_QA) + this->_biases[0];
-        }
 #ifdef NNUE_TRACE
             std::cout << "---- SqrCReLUAndLinear output " << std::endl;
-        for (size_t i = 0; i < 1 /*outputSize */; ++i) {
-            std::cout << static_cast<int>(output[i]) << ' ';
-            if ((i + 1) % 64 == 0)
-                std::cout << std::endl;
-        }
-        std::cout << std::endl;
+            std::cout << " prescaled = " << sum << " unsquared = " << output[0] << std::endl;
+            for (size_t i = 0; i < 1 /*outputSize */; ++i) {
+                std::cout << static_cast<int>(output[i]) << ' ';
+                if ((i + 1) % 64 == 0)
+                    std::cout << std::endl;
+            }
+            std::cout << std::endl;
 #endif
+        }
     }
 
 };

@@ -76,12 +76,12 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
         }
 #else
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            _biases[i] = read_little_endian<BiasType>(s);
-        }
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
             for (size_t j = 0; j < roundedInputSize && s.good(); ++j) {
                 _weights[i][j] = read_little_endian<WeightType>(s);
             }
+        }
+        for (size_t i = 0; i < outputSize && s.good(); ++i) {
+            _biases[i] = read_little_endian<BiasType>(s);
         }
 #endif
         return s;
@@ -96,9 +96,14 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
             _weights[index][i] = col[i];
     }
 
+    void setBiases(const BiasType *b) {
+        std::memcpy(_biases,b,outputSize*sizeof(BiasType));
+    }
+
 protected:
     alignas(alignment) BiasType _biases[outputSize];
     alignas(alignment) WeightType _weights[outputSize][roundedInputSize];
 };
 
 #endif
+

@@ -612,7 +612,7 @@ int main(int argc, char **argv) {
         std::ifstream in(fname);
         in >> n;
         if (in.bad()) {
-            std::cerr << "error loading " << fname << std::endl << std::flush;
+            std::cerr << "error loading " << fname << std::endl << ":" << strerror(errno) << std::flush;
         }
         else {
             const std::string fen =
