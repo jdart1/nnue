@@ -1,12 +1,12 @@
-// Copyright 2022, 2024 by Jon Dart. All Rights Reserved
-#ifndef _NNUE_SQRCRELU_H
-#define _NNUE_SQRCRELU_H
+// Copyright 2024 by Jon Dart. All Rights Reserved
+#ifndef _NNUE_SQRCRELUANDLINEAR_H
+#define _NNUE_SQRCRELUANDLINEAR_H
 
 #include "typed.h"
 
 // This combines both a SqrCReLU operation and a linear layer with output size one, the (single) hidden layer
 // in the Arasan V3 architecture.
-template <typename InputType, typename AccumulatorType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
+template <typename AccumulatorType, typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
           unsigned clampMax, size_t alignment = DEFAULT_ALIGN>
 class SqrCReLUAndLinear
     : public LinearLayer<InputType, WeightType, BiasType, OutputType, inputSize, 1, alignment> {
@@ -21,17 +21,22 @@ class SqrCReLUAndLinear
     }
 
     void postProcessAccum(const AccumulatorType &accum, OutputType *output) const {
-        //#if defined(SIMD)
-        //        if constexpr (sizeof(InputType) == 2 && sizeof(OutputType) == 1) {
-        //            simd::sqrCRelUAndLinear<InputType, OutputType, size / 2, clampMax, scaleFactor>(
-        //                accum.getOutput(AccumulatorHalf::Lower), output);
-        //            simd::sqrCRelUAndLinear<InputType, OutputType, size / 2, clampMax, scaleFactor>(
-        //                accum.getOutput(AccumulatorHalf::Upper), output + size / 2);
-        //        } else
-        //#endif
+#if defined(SIMD)
+        int32_t sum = 0;
+        if constexpr (sizeof(InputType) == 2) {
+            simd::sqrCRelUAndLinear < InputType, OutputType, WeightType, inputSize / 2, 1 >
+                                      (accum.getOutput(AccumulatorHalf::Lower), output, clampMax,
+                                       reinterpret_cast< const WeightType (&)[1][inputSize/2]>(this->_weights[0][0]));
+            sum += *output;
+            simd::sqrCRelUAndLinear < InputType, OutputType, WeightType, inputSize / 2, 1 >
+                                      (accum.getOutput(AccumulatorHalf::Upper), output, clampMax,
+                                       reinterpret_cast< const WeightType (&)[1][inputSize/2]>(this->_weights[0][inputSize/2]));
+            sum += *output;
+            output[0] = (sum / NETWORK_QA) + this->_biases[0];
+        } else
+#endif
         {
             // generic implementation
-            int sum = 0;
             static AccumulatorHalf halves[] = {AccumulatorHalf::Lower, AccumulatorHalf::Upper};
             size_t offset = 0;
 #ifdef NNUE_TRACE
@@ -60,19 +65,18 @@ class SqrCReLUAndLinear
                 offset += accum.getSize();
             }
             output[0] = (sum / NETWORK_QA) + this->_biases[0];
-#ifdef NNUE_TRACE
-            std::cout << "---- SqrCReLUAndLinear output " << std::endl;
-            std::cout << " prescaled = " << sum << " unsquared = " << output[0] << std::endl;
-            for (size_t i = 0; i < 1 /*outputSize */; ++i) {
-                std::cout << static_cast<int>(output[i]) << ' ';
-                if ((i + 1) % 64 == 0)
-                    std::cout << std::endl;
-            }
-            std::cout << std::endl;
-#endif
         }
+#ifdef NNUE_TRACE
+        std::cout << "---- SqrCReLUAndLinear output " << std::endl;
+        std::cout << " prescaled = " << sum << " unsquared = " << output[0] << std::endl;
+        for (size_t i = 0; i < 1 /*outputSize */; ++i) {
+            std::cout << static_cast<int>(output[i]) << ' ';
+            if ((i + 1) % 64 == 0)
+                std::cout << std::endl;
+        }
+        std::cout << std::endl;
+#endif
     }
-
 };
 
 #endif

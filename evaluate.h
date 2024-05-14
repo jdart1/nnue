@@ -143,7 +143,8 @@ public:
         std::cout << "output bucket=" << getOutputBucket(intf) << std::endl;
         std::cout << accum << std::endl;
 #endif        
-        return network.evaluate(accum, getOutputBucket(intf));
+        int nnOut = network.evaluate(accum, getOutputBucket(intf));
+        return (intf.sideToMove() == nnue::Black) ? -nnOut : nnOut;
     }
 
     static unsigned getOutputBucket(const ChessInterface &intf) {

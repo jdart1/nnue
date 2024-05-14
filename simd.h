@@ -52,6 +52,33 @@ static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm256_add_epi32
 static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm256_sub_epi16(x, vec_load(y)); }
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm256_sub_epi32(x, vec_load(y)); }
 
+  inline int vecHaddEpi32(vec_t vec) {
+    __m128i xmm0;
+    __m128i xmm1;
+
+    // Get the lower and upper half of the register:
+    xmm0 = _mm256_castsi256_si128(vec);
+    xmm1 = _mm256_extracti128_si256(vec, 1);
+
+    // Add the lower and upper half vertically:
+    xmm0 = _mm_add_epi32(xmm0, xmm1);
+
+    // Get the upper half of the result:
+    xmm1 = _mm_unpackhi_epi64(xmm0, xmm0);
+
+    // Add the lower and upper half vertically:
+    xmm0 = _mm_add_epi32(xmm0, xmm1);
+
+    // Shuffle the result so that the lower 32-bits are directly above the second-lower 32-bits:
+    xmm1 = _mm_shuffle_epi32(xmm0, _MM_SHUFFLE(2, 3, 0, 1));
+
+    // Add the lower 32-bits to the second-lower 32-bits vertically:
+    xmm0 = _mm_add_epi32(xmm0, xmm1);
+
+    // Cast the result to the 32-bit integer type and return it:
+    return _mm_cvtsi128_si32(xmm0);
+  }
+
 #elif defined(SSE2) || defined(SSSE3)
 using vec_t = __m128i;
 static constexpr size_t VEC_ALIGN = 32;
@@ -896,7 +923,29 @@ static inline void sqrCRelU(const InType *input, OutType *output) {
 
 // Combination of piece-wise multitplication with CRelU activation and a linear layer with 1-dimensional output.
 // Operations are re-arranged as suggested here: https://github.com/cosmobobak/viridithas/blob/master/nnue-speedups.md#lizard-simd-for-squared-clipped-relu, allowing efficient SIMD execution with 16-bit quantities (originally implemented in LizardChess).
-
+    template <typename InType, typename OutType, typename WeightType, size_t inputSize /* features */, size_t outputSize>
+static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
+                                     const int clampMax, const WeightType (&weights)[outputSize][inputSize]) {
+#ifdef AVX2
+    static_assert(sizeof(InType) == 2, "only 16bit is supported");
+    vec_t QAvec = _mm256_set1_epi16(clampMax);
+    vec_t sum = zero;
+    size_t offset = 0;
+    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+    constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
+    for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
+        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[0][offset]);
+        vec_t x = _mm256_min_epi16(QAvec, _mm256_max_epi16(vec_load(inp + i), zero));
+        vec_t y = _mm256_mullo_epi16(x, vec_load(w));
+        y = _mm256_madd_epi16(x, y);
+        sum = _mm256_add_epi32(sum, y);
+    }
+    // horizontal add output register
+    output[0] = vecHaddEpi32(sum);
+#else
+#error not implemented yet
+#endif
+}
 
 } // namespace simd
 
