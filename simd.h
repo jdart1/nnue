@@ -52,7 +52,27 @@ static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm256_add_epi32
 static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm256_sub_epi16(x, vec_load(y)); }
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm256_sub_epi32(x, vec_load(y)); }
 
-  inline int vecHaddEpi32(vec_t vec) {
+    /*
+// see https://makemeengr.com/fastest-method-to-calculate-sum-of-all-packed-32-bit-integers-using-avx512-or-avx2/
+uint32_t hsum_epi32_avx(__m128i x)
+{
+    __m128i hi64  = _mm_unpackhi_epi64(x, x);           // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
+    __m128i sum64 = _mm_add_epi32(hi64, x);
+    __m128i hi32  = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));    // Swap the low two elements
+    __m128i sum32 = _mm_add_epi32(sum64, hi32);
+    return _mm_cvtsi128_si32(sum32);       // movd
+}
+// only needs AVX2
+uint32_t hsum_8x32(__m256i v)
+{
+    __m128i sum128 = _mm_add_epi32( 
+                 _mm256_castsi256_si128(v),
+                 _mm256_extracti128_si256(v, 1)); // silly GCC uses a longer AXV512VL instruction if AVX512 is enabled :/
+    return hsum_epi32_avx(sum128);
+}
+    */
+
+    inline int vecHaddEpi32(vec_t vec) {
     __m128i xmm0;
     __m128i xmm1;
 

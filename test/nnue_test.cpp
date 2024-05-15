@@ -35,6 +35,7 @@ static int test_linear() {
     auto buf = std::unique_ptr<std::byte[]>(new std::byte[bufSize]);
 
     std::byte *b = buf.get();
+#ifdef STOCKFISH_FORMAT    
     BiasType *bb = reinterpret_cast<BiasType *>(b);
     for (size_t i = 0; i < COLS; i++) {
         *bb++ = biases[i] = (i%15) + i - 10;
@@ -47,6 +48,21 @@ static int test_linear() {
             *w++ = weights[i][j] = ((i+j) % 20) - 10;
         }
     }
+#else
+    // weights first
+    WeightType *w = reinterpret_cast<WeightType*>(b);
+    // serialized in column order
+    for (size_t i = 0; i < COLS; i++) {
+        for (size_t j = 0; j < ROUNDED_ROWS; j++) {
+            *w++ = weights[i][j] = ((i+j) % 20) - 10;
+        }
+    }
+    b += COLS*ROUNDED_ROWS*sizeof(WeightType);
+    BiasType *bb = reinterpret_cast<BiasType *>(b);
+    for (size_t i = 0; i < COLS; i++) {
+        *bb++ = biases[i] = (i%15) + i - 10;
+    }
+#endif    
 
     nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS> layer;
 
@@ -276,16 +292,10 @@ static int test_feature() {
 
     ArasanV3Feature::AccumulatorType accum;
 
-    feature.get()->setCol(547, col1);
-    feature.get()->setCol(352, col2);
-    feature.get()->setCol(1878, col3);
-    feature.get()->setCol(1637, col4);
-    /*    
-    feature.get()->setPSQ(20800, psq1);
-    feature.get()->setPSQ(20804, psq2);
-    feature.get()->setPSQ(18254, psq3);
-    feature.get()->setPSQ(17988, psq4);
-    */
+    feature.get()->setCol(36, col1);
+    feature.get()->setCol(686, col2);
+    feature.get()->setCol(1748, col3);
+    feature.get()->setCol(2097, col4);
     feature.get()->setBiases(biases);
 
     feature.get()->updateAccum(bIndices, nnue::AccumulatorHalf::Lower, accum);

@@ -46,9 +46,11 @@ public:
         //#else
         output.init_half(half,this->_biases);
         for (auto it = indices.begin(); it != indices.end() && *it != LAST_INDEX; ++it) {
+#ifdef NNUE_TRACE
             std::cout << "index " << *it << " adding weights ";
             for (size_t i = 0; i < 20; ++i) std::cout << this->_weights[*it][i] << ' ';
             std::cout << "to side " << (half == AccumulatorHalf::Lower ? 0 : 1) << std::endl;
+#endif
             output.add_half(half,this->_weights[*it]);
         }
         //#endif
