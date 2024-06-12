@@ -52,9 +52,8 @@ static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm256_add_epi32
 static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm256_sub_epi16(x, vec_load(y)); }
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm256_sub_epi32(x, vec_load(y)); }
 
-    /*
 // see https://makemeengr.com/fastest-method-to-calculate-sum-of-all-packed-32-bit-integers-using-avx512-or-avx2/
-uint32_t hsum_epi32_avx(__m128i x)
+static uint32_t hsum_epi32_avx(__m128i x)
 {
     __m128i hi64  = _mm_unpackhi_epi64(x, x);           // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
     __m128i sum64 = _mm_add_epi32(hi64, x);
@@ -62,42 +61,14 @@ uint32_t hsum_epi32_avx(__m128i x)
     __m128i sum32 = _mm_add_epi32(sum64, hi32);
     return _mm_cvtsi128_si32(sum32);       // movd
 }
-// only needs AVX2
-uint32_t hsum_8x32(__m256i v)
+
+static uint32_t hsum_8x32(__m256i v)
 {
-    __m128i sum128 = _mm_add_epi32( 
+    __m128i sum128 = _mm_add_epi32(
                  _mm256_castsi256_si128(v),
                  _mm256_extracti128_si256(v, 1)); // silly GCC uses a longer AXV512VL instruction if AVX512 is enabled :/
     return hsum_epi32_avx(sum128);
 }
-    */
-
-    inline int vecHaddEpi32(vec_t vec) {
-    __m128i xmm0;
-    __m128i xmm1;
-
-    // Get the lower and upper half of the register:
-    xmm0 = _mm256_castsi256_si128(vec);
-    xmm1 = _mm256_extracti128_si256(vec, 1);
-
-    // Add the lower and upper half vertically:
-    xmm0 = _mm_add_epi32(xmm0, xmm1);
-
-    // Get the upper half of the result:
-    xmm1 = _mm_unpackhi_epi64(xmm0, xmm0);
-
-    // Add the lower and upper half vertically:
-    xmm0 = _mm_add_epi32(xmm0, xmm1);
-
-    // Shuffle the result so that the lower 32-bits are directly above the second-lower 32-bits:
-    xmm1 = _mm_shuffle_epi32(xmm0, _MM_SHUFFLE(2, 3, 0, 1));
-
-    // Add the lower 32-bits to the second-lower 32-bits vertically:
-    xmm0 = _mm_add_epi32(xmm0, xmm1);
-
-    // Cast the result to the 32-bit integer type and return it:
-    return _mm_cvtsi128_si32(xmm0);
-  }
 
 #elif defined(SSE2) || defined(SSSE3)
 using vec_t = __m128i;
@@ -961,8 +932,9 @@ static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
         sum = _mm256_add_epi32(sum, y);
     }
     // horizontal add output register
-    output[0] = vecHaddEpi32(sum);
-#else
+    output[0] = hsum_8x32(sum);
+#elif defined(SSE2)
+
 #error not implemented yet
 #endif
 }

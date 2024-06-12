@@ -76,10 +76,10 @@ public:
                      size_t added_count, size_t removed_count,
                      AccumulatorHalf half, AccumulatorType &output) const noexcept {
         for (size_t i = 0; i < added_count; i++) {
-            output.add_half(half, this->_weights[added[i]], this->_psq[added[i]]);
+            output.add_half(half, this->_weights[added[i]]);
         }
         for (size_t i = 0; i < removed_count; i++) {
-            output.sub_half(half, this->_weights[removed[i]], this->_psq[removed[i]]);
+            output.sub_half(half, this->_weights[removed[i]]);
         }
     }
 

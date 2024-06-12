@@ -74,6 +74,10 @@ public:
                             added, added_count, removed, removed_count);
         ciTarget.getAccumulator().setState(targetHalf,
                                            AccumulatorState::Computed);
+#ifdef NNUE_TRACE
+        std::cout << "incremental evaluate" << std::endl;
+        std::cout << ciTarget.getAccumulator(targetHalf) << std::endl;
+#endif
     }
 
     // Full evaluation of 1/2 of the accumulator for a specified color (c)
@@ -142,9 +146,8 @@ public:
         std::cout << "full evaluate" << std::endl;
         std::cout << "output bucket=" << getOutputBucket(intf) << std::endl;
         std::cout << accum << std::endl;
-#endif        
-        int nnOut = network.evaluate(accum, getOutputBucket(intf));
-        return (intf.sideToMove() == nnue::Black) ? -nnOut : nnOut;
+#endif
+        return network.evaluate(accum, intf.sideToMove(), getOutputBucket(intf));
     }
 
     static unsigned getOutputBucket(const ChessInterface &intf) {

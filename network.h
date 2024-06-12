@@ -51,7 +51,7 @@ class Network {
     }
 
     // evaluate the net (layers past the first one)
-    int32_t evaluate(const AccumulatorType &accum, unsigned bucket) const {
+    int32_t evaluate(const AccumulatorType &accum, [[maybe_unused]] Color sideToMove, unsigned bucket) const {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
         // propagate data through the remaining layers
 #ifdef NNUE_TRACE
@@ -67,7 +67,7 @@ class Network {
         std::cout << "NN output, after scaling: "
                   << (nnOut * NETWORK_SCALE) / (NETWORK_QA * NETWORK_QB) << std::endl;
 #endif
-        return (nnOut * NETWORK_SCALE) / (NETWORK_QA * NETWORK_QB);
+       return (nnOut * NETWORK_SCALE) / (NETWORK_QA * NETWORK_QB);
     }
 
     friend std::istream &operator>>(std::istream &i, Network &);
