@@ -52,24 +52,6 @@ static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm256_add_epi32
 static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm256_sub_epi16(x, vec_load(y)); }
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm256_sub_epi32(x, vec_load(y)); }
 
-// see https://makemeengr.com/fastest-method-to-calculate-sum-of-all-packed-32-bit-integers-using-avx512-or-avx2/
-static uint32_t hsum_epi32_avx(__m128i x)
-{
-    __m128i hi64  = _mm_unpackhi_epi64(x, x);           // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
-    __m128i sum64 = _mm_add_epi32(hi64, x);
-    __m128i hi32  = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));    // Swap the low two elements
-    __m128i sum32 = _mm_add_epi32(sum64, hi32);
-    return _mm_cvtsi128_si32(sum32);       // movd
-}
-
-static uint32_t hsum_8x32(__m256i v)
-{
-    __m128i sum128 = _mm_add_epi32(
-                 _mm256_castsi256_si128(v),
-                 _mm256_extracti128_si256(v, 1)); // silly GCC uses a longer AXV512VL instruction if AVX512 is enabled :/
-    return hsum_epi32_avx(sum128);
-}
-
 #elif defined(SSE2) || defined(SSSE3)
 using vec_t = __m128i;
 static constexpr size_t VEC_ALIGN = 32;
@@ -171,7 +153,23 @@ struct SimdOperations {
     static inline void set_zero(vec_t &x) { x = zero; }
 };
 
-#ifdef AVX2
+#if defined(SSE2)
+static inline uint32_t hsum_8x32(vec_t x) {
+    // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction
+#ifdef __AVX__
+    __m128i hi64  = _mm_unpackhi_epi64(x, x);
+#else
+    __m128i hi64  = _mm_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2));
+#endif
+    __m128i sum64 = _mm_add_epi32(hi64, x);
+    __m128i hi32  = _mm_shufflelo_epi16(sum64, _MM_SHUFFLE(1, 0, 3, 2));    // Swap the low two elements
+    __m128i sum32 = _mm_add_epi32(sum64, hi32);
+    return _mm_cvtsi128_si32(sum32);       // SSE2 movd
+    //return _mm_extract_epi32(hl, 0);     // SSE4, even though it compiles to movd instead of a literal pextrd r32,xmm,0
+}
+#endif
+    
+#if defined(AVX2)
 template <size_t bytes>
 struct SimdOperationsAvx2 {
     using vec_type = __m256i;
@@ -187,6 +185,61 @@ struct SimdOperationsAvx2 {
     static inline void store(vec_type *x, const vec_type y) { _mm256_store_si256(x, y); }
     static inline void set_zero(vec_type &x) { x = zero256; }
 };
+
+[[maybe_unused]] void inline m256_add_dpbusd_epi32(__m256i &acc, __m256i a, __m256i b) {
+#ifdef VNNI
+    acc = _mm256_dpbusd_epi32(acc, a, b);
+#else
+    __m256i x = _mm256_maddubs_epi16(a, b);
+    x = _mm256_madd_epi16(x, ones256);
+    acc = _mm256_add_epi32(acc, x);
+#endif
+}
+
+inline int32_t hadd_8x32(__m256i prod) {
+    __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod), _mm256_extracti128_si256(prod, 1));
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
+    return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
+}
+
+// see https://makemeengr.com/fastest-method-to-calculate-sum-of-all-packed-32-bit-integers-using-avx512-or-avx2/
+static uint32_t hsum_epi32_avx(__m128i x)
+{
+    __m128i hi64  = _mm_unpackhi_epi64(x, x);           // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
+    __m128i sum64 = _mm_add_epi32(hi64, x);
+    __m128i hi32  = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));    // Swap the low two elements
+    __m128i sum32 = _mm_add_epi32(sum64, hi32);
+    return _mm_cvtsi128_si32(sum32);       // movd
+}
+
+inline static uint32_t hsum_8x32(__m256i v)
+{
+    __m128i sum128 = _mm_add_epi32(
+                 _mm256_castsi256_si128(v),
+                 _mm256_extracti128_si256(v, 1));
+    return hsum_epi32_avx(sum128);
+}
+
+#endif
+
+#ifdef AVX512
+[[maybe_unused]] void inline m512_add_dpbusd_epi32(__m512i &acc, __m512i a, __m512i b) {
+#ifdef AVX512_VNNI
+    acc = _mm512_dpbusd_epi32(acc, a, b);
+#else
+    __m512i x = _mm512_maddubs_epi16(a, b);
+    x = _mm512_madd_epi16(x, ones512);
+    acc = _mm512_add_epi32(acc, x);
+#endif
+}
+
+inline static int32_t hsum_8x32(vec_t prod)
+{
+    const __m256i sum256 = _mm256_add_epi32(
+        _mm512_castsi512_si256(prod),
+        _mm512_extracti64x4_epi64(prod, 1));
+    return hsum_8x32(sum256); // AVX2 version (256-bit)
+}
 #endif
 
 #endif
@@ -267,36 +320,6 @@ static inline void dotProduct32x1(const uint8_t *input, const int8_t *weights,
 #endif
 }
 
-#ifdef AVX512
-[[maybe_unused]] auto inline m512_add_dpbusd_epi32(__m512i &acc, __m512i a, __m512i b) {
-#ifdef AVX512_VNNI
-    acc = _mm512_dpbusd_epi32(acc, a, b);
-#else
-    __m512i x = _mm512_maddubs_epi16(a, b);
-    x = _mm512_madd_epi16(x, ones512);
-    acc = _mm512_add_epi32(acc, x);
-#endif
-}
-#endif
-
-#ifdef AVX2
-[[maybe_unused]] auto inline m256_add_dpbusd_epi32(__m256i &acc, __m256i a, __m256i b) {
-#ifdef VNNI
-    acc = _mm256_dpbusd_epi32(acc, a, b);
-#else
-    __m256i x = _mm256_maddubs_epi16(a, b);
-    x = _mm256_madd_epi16(x, ones256);
-    acc = _mm256_add_epi32(acc, x);
-#endif
-}
-
-inline int32_t m256_hadd_8x32(__m256i prod) {
-    __m128i sum = _mm_add_epi32(_mm256_castsi256_si128(prod), _mm256_extracti128_si256(prod, 1));
-    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
-    return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1);
-}
-#endif
-
 // dot product, input of at least 32 to output > 1
 // input uint_8t, output int32_t
 template <size_t inputSize, size_t roundedInputSize, size_t outputSize>
@@ -327,7 +350,7 @@ inline void dotProductnxn(const uint8_t *input, const int8_t weights[outputSize]
             const __m256i *inp = reinterpret_cast<const __m256i *>(&input[j]);
             m256_add_dpbusd_epi32(prod, inp[0], w[j / 32]);
         }
-        output[i] += m256_hadd_8x32(prod);
+        output[i] += hadd_8x32(prod);
     }
 #elif defined(SSSE3)
     const vec_t *inp = reinterpret_cast<const vec_t *>(input);
@@ -917,8 +940,23 @@ static inline void sqrCRelU(const InType *input, OutType *output) {
     template <typename InType, typename OutType, typename WeightType, size_t inputSize /* features */, size_t outputSize>
 static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
                                      const int clampMax, const WeightType (&weights)[outputSize][inputSize]) {
-#ifdef AVX2
     static_assert(sizeof(InType) == 2, "only 16bit is supported");
+#ifdef AVX512
+    vec_t QAvec = _mm512_set1_epi16(clampMax);
+    vec_t sum = zero;
+    size_t offset = 0;
+    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+    constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
+    for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
+        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[0][offset]);
+        vec_t x = _mm512_min_epi16(QAvec, _mm512_max_epi16(vec_load(inp + i), zero));
+        vec_t y = _mm512_mullo_epi16(x, vec_load(w));
+        y = _mm512_madd_epi16(x, y);
+        sum = _mm512_add_epi32(sum, y);
+    }
+    // horizontal add output register
+    output[0] = hsum_8x32(sum);
+#elif defined(AVX2)        
     vec_t QAvec = _mm256_set1_epi16(clampMax);
     vec_t sum = zero;
     size_t offset = 0;
@@ -934,11 +972,24 @@ static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
     // horizontal add output register
     output[0] = hsum_8x32(sum);
 #elif defined(SSE2)
-
-#error not implemented yet
+    vec_t QAvec = _mm_set1_epi16(clampMax);
+    vec_t sum = zero;
+    size_t offset = 0;
+    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+    constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
+    for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
+        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[0][offset]);
+        vec_t x = _mm_min_epi16(QAvec, _mm_max_epi16(vec_load(inp + i), zero));
+        vec_t y = _mm_mullo_epi16(x, vec_load(w));
+        y = _mm_madd_epi16(x, y);
+        sum = _mm_add_epi32(sum, y);
+    }
+    // horizontal add output register
+    output[0] = hsum_8x32(sum);
 #endif
 }
 
 } // namespace simd
 
 #endif
+
