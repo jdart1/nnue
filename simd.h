@@ -34,8 +34,12 @@ static inline vec_t vec_load(const vec_t *x) { return _mm512_load_si512(x); }
 static inline void vec_store(vec_t *x, vec_t y) { _mm512_store_si512(x, y); }
 static inline vec_t vec_add16(vec_t x, const vec_t *y) { return _mm512_add_epi16(x, vec_load(y)); }
 static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm512_add_epi32(x, vec_load(y)); }
+static inline vec_t vec_add32(vec_t x, vec_t y) { return _mm512_add_epi32(x, y); }
 static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm512_sub_epi16(x, vec_load(y)); }
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm512_sub_epi32(x, vec_load(y)); }
+static inline vec_t vec_clamp(vec_t x, vec_t maxValues) { return _mm512_min_epi16(maxValues, _mm512_max_epi16(x, zero)) }
+static inline vec_t vec_mullo16(vec_t x, vec_t y) { return _mm512_mullo_epi16(x, y); }
+static inline vec_t vec_madd16(vec_t x, vec_t y) { return _mm512_madd_epi16(x, y); }
 #elif defined(AVX2)
 using vec_t = __m256i;
 static constexpr size_t VEC_ALIGN = 32;
@@ -49,9 +53,12 @@ static inline vec_t vec_load(const vec_t *x) { return _mm256_load_si256(x); }
 static inline void vec_store(vec_t *x, vec_t y) { _mm256_store_si256(x, y); }
 static inline vec_t vec_add16(vec_t x, const vec_t *y) { return _mm256_add_epi16(x, vec_load(y)); }
 static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm256_add_epi32(x, vec_load(y)); }
+static inline vec_t vec_add32(vec_t x, vec_t y) { return _mm256_add_epi32(x, y); }
 static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm256_sub_epi16(x, vec_load(y)); }
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm256_sub_epi32(x, vec_load(y)); }
-
+static inline vec_t vec_clamp(vec_t x, vec_t maxValues) { return _mm256_min_epi16(maxValues, _mm256_max_epi16(x, zero)); }
+static inline vec_t vec_mullo16(vec_t x, vec_t y) { return _mm256_mullo_epi16(x, y); }
+static inline vec_t vec_madd16(vec_t x, vec_t y) { return _mm256_madd_epi16(x, y); }
 #elif defined(SSE2) || defined(SSSE3)
 using vec_t = __m128i;
 static constexpr size_t VEC_ALIGN = 32;
@@ -64,8 +71,12 @@ static inline vec_t vec_load(const vec_t *x) { return _mm_load_si128(x); }
 static inline void vec_store(vec_t *x, vec_t y) { _mm_store_si128(x, y); }
 static inline vec_t vec_add16(vec_t x, const vec_t *y) { return _mm_add_epi16(x, vec_load(y)); }
 static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm_add_epi32(x, vec_load(y)); }
+static inline vec_t vec_add32(vec_t x, vec_t y) { return _mm_add_epi32(x, y); }
 static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm_sub_epi16(x, vec_load(y)); }
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm_sub_epi32(x, vec_load(y)); }
+static inline vec_t vec_clamp(vec_t x, vec_t maxValues) { return _mm_min_epi16(maxValues, _mm_max_epi16(x, zero)); }
+static inline vec_t vec_mullo16(vec_t x, vec_t y) { return _mm_mullo_epi16(x, y); }
+static inline vec_t vec_madd16(vec_t x, vec_t y) { return _mm_madd_epi16(x, y); }
 #elif defined(NEON)
 using vec_t = int16x8_t;
 using vec16_t = int16x8_t;
@@ -936,54 +947,23 @@ static inline void sqrCRelU(const InType *input, OutType *output) {
 // Operations are re-arranged as suggested here: https://github.com/cosmobobak/viridithas/blob/master/nnue-speedups.md#lizard-simd-for-squared-clipped-relu, allowing efficient SIMD execution with 16-bit quantities (originally implemented in LizardChess).
     template <typename InType, typename OutType, typename WeightType, size_t inputSize /* features */, size_t outputSize>
 static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
-                                     const int clampMax, const WeightType &weights[inputSize]) {
+                                     const int clampMax, const WeightType *weights) {
     static_assert(sizeof(InType) == 2, "only 16bit is supported");
-#ifdef AVX512
-    vec_t QAvec = _mm512_set1_epi16(clampMax);
+#if !defined(NEON)
+    const vec_t maxValues = vec_set_16(clampMax);
     vec_t sum = zero;
-    size_t offset = 0;
     const vec_t *inp = reinterpret_cast<const vec_t*>(input);
     constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
-    for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
-        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[offset]);
-        vec_t x = _mm512_min_epi16(QAvec, _mm512_max_epi16(vec_load(inp + i), zero));
-        vec_t y = _mm512_mullo_epi16(x, vec_load(w));
-        y = _mm512_madd_epi16(x, y);
-        sum = _mm512_add_epi32(sum, y);
+    for (size_t i = 0; i < iterations; ++i) {
+        const vec_t *w = reinterpret_cast<const vec_t *>(weights);
+        vec_t x = vec_clamp(vec_load(inp + i), maxValues);
+        vec_t y = vec_mullo16(x, vec_load(w + i));
+        y = vec_madd16(x, y);
+        sum = vec_add32(sum, y);
     }
     // horizontal add output register
     output[0] = hsum_8x32(sum);
-#elif defined(AVX2)        
-    vec_t QAvec = _mm256_set1_epi16(clampMax);
-    vec_t sum = zero;
-    size_t offset = 0;
-    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
-    constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
-    for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
-        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[offset]);
-        vec_t x = _mm256_min_epi16(QAvec, _mm256_max_epi16(vec_load(inp + i), zero));
-        vec_t y = _mm256_mullo_epi16(x, vec_load(w));
-        y = _mm256_madd_epi16(x, y);
-        sum = _mm256_add_epi32(sum, y);
-    }
-    // horizontal add output register
-    output[0] = hsum_8x32(sum);
-#elif defined(SSE2)
-    vec_t QAvec = _mm_set1_epi16(clampMax);
-    vec_t sum = zero;
-    size_t offset = 0;
-    const vec_t *inp = reinterpret_cast<const vec_t*>(input);
-    constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
-    for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
-        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[offset]);
-        vec_t x = _mm_min_epi16(QAvec, _mm_max_epi16(vec_load(inp + i), zero));
-        vec_t y = _mm_mullo_epi16(x, vec_load(w));
-        y = _mm_madd_epi16(x, y);
-        sum = _mm_add_epi32(sum, y);
-    }
-    // horizontal add output register
-    output[0] = hsum_8x32(sum);
-#endif
+#endif    
 }
 
 } // namespace simd

@@ -187,7 +187,7 @@ static int test_feature() {
 
     // ArasanV3Feature::FeatureXformer::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
     for (size_t i = 0; i < ArasanV3Feature::OutputSize; i++) {
-         col1[i] = -1550 + i;
+         col1[i] = -200 + i;
          col2[i] = 432 + i;
          col3[i] = -591 + i;
          col4[i] = -240 + i;
@@ -325,14 +325,13 @@ static int test_feature() {
 
     // Test output layer
     nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
-                            ArasanV3Feature::OutputSize, 255> outputLayer;
+                            ArasanV3Feature::OutputSize * 2, 255> outputLayer;
 
     int32_t out, out2;
     outputLayer.postProcessAccum(accum, &out);
     // compare output with generic implementation
     size_t offset = 0;
     int32_t sum = 0;
-    std::cout << "----" << std::endl;
     for (auto h : halves) {
         for (size_t i = 0; i < accum.getSize(); ++i) {
             int16_t x = accum.getOutput(h)[i];
@@ -342,7 +341,6 @@ static int test_feature() {
             int16_t product = (x * outputLayer.getCol(0)[i + offset]) & 0xffff;
             // square and sum
             sum += product * x;
-            if (outputLayer.getCol(0)[i + offset] != 0) std::cout << i << " x (clamped)=" << x << " product=" << product << " product*x=" << product*x << " sum=" << sum << std::endl;
         }
         offset += accum.getSize();
     }
