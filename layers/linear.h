@@ -14,7 +14,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
     static constexpr size_t roundedInputSize = std::max<size_t>(32, inputSize);
 
   public:
-    LinearLayer() : _biases{0}, _weights{0} {
+    LinearLayer() : _biases{{0}}, _weights{{0}} {
     }
 
     virtual ~LinearLayer() = default;
