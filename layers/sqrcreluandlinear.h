@@ -21,16 +21,16 @@ class SqrCReLUAndLinear
     }
 
     void postProcessAccum(const AccumulatorType &accum, OutputType *output) const {
-#if defined(SIMD)
         int32_t sum = 0;
+#if defined(SIMD)
         if constexpr (sizeof(InputType) == 2) {
             simd::sqrCRelUAndLinear < InputType, OutputType, WeightType, inputSize / 2, 1 >
                                       (accum.getOutput(AccumulatorHalf::Lower), output, clampMax,
-                                       reinterpret_cast< const WeightType (&)[1][inputSize/2]>(this->_weights[0][0]));
+                                       reinterpret_cast< const WeightType (&)[inputSize/2]>(this->_weights[0][0]));
             sum += *output;
             simd::sqrCRelUAndLinear < InputType, OutputType, WeightType, inputSize / 2, 1 >
                                       (accum.getOutput(AccumulatorHalf::Upper), output, clampMax,
-                                       reinterpret_cast< const WeightType (&)[1][inputSize/2]>(this->_weights[0][inputSize/2]));
+                                       reinterpret_cast< const WeightType (&)[inputSize/2]>(this->_weights[0][inputSize/2]));
             sum += *output;
             output[0] = (sum / NETWORK_QA) + this->_biases[0];
         } else
@@ -61,6 +61,7 @@ class SqrCReLUAndLinear
                     int16_t product = (x * this->_weights[0][i + offset]) & 0xffff;
                     // square and sum
                     sum += product * x;
+                    if (this->_weights[0][i + offset] != 0) std::cout << i << " x (clamped)=" << x << " product=" << product << " product*x=" << product*x << " sum=" << sum << std::endl;
                 }
                 offset += accum.getSize();
             }

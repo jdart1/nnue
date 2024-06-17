@@ -178,6 +178,7 @@ static int16_t col1[ArasanV3Feature::OutputSize];
 static int16_t col2[ArasanV3Feature::OutputSize];
 static int16_t col3[ArasanV3Feature::OutputSize];
 static int16_t col4[ArasanV3Feature::OutputSize];
+static int16_t zero_col[ArasanV3Feature::OutputSize] = {0};
 static int16_t biases[ArasanV3Feature::OutputSize];
 
 static int test_feature() {
@@ -292,6 +293,8 @@ static int test_feature() {
 
     ArasanV3Feature::AccumulatorType accum;
 
+    for (size_t i = 0; i < ArasanV3Feature::InputSize; ++i) feature.get()->setCol(i,zero_col);
+
     feature.get()->setCol(36, col1);
     feature.get()->setCol(686, col2);
     feature.get()->setCol(1748, col3);
@@ -318,6 +321,36 @@ static int test_feature() {
                           << accum.getOutput(h)[i] << std::endl;
             }
         }
+    }
+
+    // Test output layer
+    nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
+                            ArasanV3Feature::OutputSize, 255> outputLayer;
+
+    int32_t out, out2;
+    outputLayer.postProcessAccum(accum, &out);
+    // compare output with generic implementation
+    size_t offset = 0;
+    int32_t sum = 0;
+    std::cout << "----" << std::endl;
+    for (auto h : halves) {
+        for (size_t i = 0; i < accum.getSize(); ++i) {
+            int16_t x = accum.getOutput(h)[i];
+            // CReLU
+            x = std::clamp<int16_t>(x, 0, 255);
+            // multiply by weights and keep in 16-bit range
+            int16_t product = (x * outputLayer.getCol(0)[i + offset]) & 0xffff;
+            // square and sum
+            sum += product * x;
+            if (outputLayer.getCol(0)[i + offset] != 0) std::cout << i << " x (clamped)=" << x << " product=" << product << " product*x=" << product*x << " sum=" << sum << std::endl;
+        }
+        offset += accum.getSize();
+    }
+    out2 = (sum / nnue::NETWORK_QA) + *(feature.get()->getBiases());
+    if (out != out2) {
+        std::cerr << "error in output layer" << std::endl;
+        std::cerr << out << ' ' << out2 << std::endl;
+        ++errs;
     }
 
     // test PSQ update
@@ -595,8 +628,8 @@ int main(int argc, char **argv) {
     errs += test_linear<32,32>();
     errs += test_linear<16,16>();
     errs += test_linear<32,1>();
-    errs += test_feature();
     errs += test_incremental();
+    errs += test_feature();
     //    errs += test_CReLU<16>();
     //    errs += test_CReLU<32>();
     std::cerr << errs << " errors" << std::endl;

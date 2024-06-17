@@ -128,6 +128,10 @@ public:
         std::memcpy(_biases,reinterpret_cast<const void*>(b),sizeof(BiasType)*outputSize);
     }
 
+    const BiasType *getBiases() const noexcept {
+        return _biases;
+    }
+
 private:
     static constexpr unsigned pieceTypeMap[2][16] = {
                                                      {0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 0},

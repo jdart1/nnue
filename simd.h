@@ -153,22 +153,6 @@ struct SimdOperations {
     static inline void set_zero(vec_t &x) { x = zero; }
 };
 
-#if defined(SSE2)
-static inline uint32_t hsum_8x32(vec_t x) {
-    // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction
-#ifdef __AVX__
-    __m128i hi64  = _mm_unpackhi_epi64(x, x);
-#else
-    __m128i hi64  = _mm_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2));
-#endif
-    __m128i sum64 = _mm_add_epi32(hi64, x);
-    __m128i hi32  = _mm_shufflelo_epi16(sum64, _MM_SHUFFLE(1, 0, 3, 2));    // Swap the low two elements
-    __m128i sum32 = _mm_add_epi32(sum64, hi32);
-    return _mm_cvtsi128_si32(sum32);       // SSE2 movd
-    //return _mm_extract_epi32(hl, 0);     // SSE4, even though it compiles to movd instead of a literal pextrd r32,xmm,0
-}
-#endif
-    
 #if defined(AVX2)
 template <size_t bytes>
 struct SimdOperationsAvx2 {
@@ -203,7 +187,7 @@ inline int32_t hadd_8x32(__m256i prod) {
 }
 
 // see https://makemeengr.com/fastest-method-to-calculate-sum-of-all-packed-32-bit-integers-using-avx512-or-avx2/
-static uint32_t hsum_epi32_avx(__m128i x)
+inline static uint32_t hsum_8x32_avx(__m128i x)
 {
     __m128i hi64  = _mm_unpackhi_epi64(x, x);           // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
     __m128i sum64 = _mm_add_epi32(hi64, x);
@@ -217,7 +201,7 @@ inline static uint32_t hsum_8x32(__m256i v)
     __m128i sum128 = _mm_add_epi32(
                  _mm256_castsi256_si128(v),
                  _mm256_extracti128_si256(v, 1));
-    return hsum_epi32_avx(sum128);
+    return hsum_8x32_avx(sum128);
 }
 
 #endif
@@ -242,6 +226,19 @@ inline static int32_t hsum_8x32(vec_t prod)
 }
 #endif
 
+#if defined(SSE2)
+static inline uint32_t hsum_8x32(__m128i x) {
+    // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction
+    // TBD: use AVX version if possible? Right now we assume no AVX
+    //    return hsum_8x32_avx2(x);
+    __m128i hi64  = _mm_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2));
+    __m128i sum64 = _mm_add_epi32(hi64, x);
+    __m128i hi32  = _mm_shufflelo_epi16(sum64, _MM_SHUFFLE(1, 0, 3, 2));    // Swap the low two elements
+    __m128i sum32 = _mm_add_epi32(sum64, hi32);
+    return _mm_cvtsi128_si32(sum32);       // SSE2 movd
+}
+#endif
+    
 #endif
 
 template <typename T, unsigned simdWidth> inline static constexpr size_t chunks(unsigned len) {
@@ -939,7 +936,7 @@ static inline void sqrCRelU(const InType *input, OutType *output) {
 // Operations are re-arranged as suggested here: https://github.com/cosmobobak/viridithas/blob/master/nnue-speedups.md#lizard-simd-for-squared-clipped-relu, allowing efficient SIMD execution with 16-bit quantities (originally implemented in LizardChess).
     template <typename InType, typename OutType, typename WeightType, size_t inputSize /* features */, size_t outputSize>
 static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
-                                     const int clampMax, const WeightType (&weights)[outputSize][inputSize]) {
+                                     const int clampMax, const WeightType &weights[inputSize]) {
     static_assert(sizeof(InType) == 2, "only 16bit is supported");
 #ifdef AVX512
     vec_t QAvec = _mm512_set1_epi16(clampMax);
@@ -948,7 +945,7 @@ static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
     const vec_t *inp = reinterpret_cast<const vec_t*>(input);
     constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
     for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
-        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[0][offset]);
+        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[offset]);
         vec_t x = _mm512_min_epi16(QAvec, _mm512_max_epi16(vec_load(inp + i), zero));
         vec_t y = _mm512_mullo_epi16(x, vec_load(w));
         y = _mm512_madd_epi16(x, y);
@@ -963,7 +960,7 @@ static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
     const vec_t *inp = reinterpret_cast<const vec_t*>(input);
     constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
     for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
-        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[0][offset]);
+        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[offset]);
         vec_t x = _mm256_min_epi16(QAvec, _mm256_max_epi16(vec_load(inp + i), zero));
         vec_t y = _mm256_mullo_epi16(x, vec_load(w));
         y = _mm256_madd_epi16(x, y);
@@ -978,7 +975,7 @@ static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
     const vec_t *inp = reinterpret_cast<const vec_t*>(input);
     constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
     for (size_t i = 0; i < iterations; ++i, offset += simdWidth / 16) {
-        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[0][offset]);
+        const vec_t *w = reinterpret_cast<const vec_t *>(&weights[offset]);
         vec_t x = _mm_min_epi16(QAvec, _mm_max_epi16(vec_load(inp + i), zero));
         vec_t y = _mm_mullo_epi16(x, vec_load(w));
         y = _mm_madd_epi16(x, y);
