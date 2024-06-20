@@ -29,8 +29,8 @@ static constexpr int NETWORK_SCALE = 400;
 
 using IndexArray = std::array<IndexType,MAX_INDICES>;
 
-// version of the network (Stockfish compatible)
-static constexpr uint32_t NN_VERSION = 0x7AF32F20u;
+// version of the network
+static constexpr uint32_t NN_VERSION = 0x68AE02B9u;
 
 #endif
 
