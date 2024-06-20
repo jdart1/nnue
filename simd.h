@@ -910,33 +910,21 @@ static inline void sqrCRelU(const InType *input, OutType *output) {
     vec_t *outp = reinterpret_cast<vec_t *>(output);
 
     for (size_t i = 0; i < chunks<InType, simdWidth>(size / 2); ++i) {
+        const vec_t sum0a = vec_clamp(inp0[i * 2], limit);
+        const vec_t sum0b = vec_clamp(inp0[i * 2 + 1], limit);
+        const vec_t sum1a = vec_clamp(inp0[i * 2], limit);
+        const vec_t sum1b = vec_clamp(inp1[i * 2 + 1], limit);
+        const vec_t prod0 = vec_mullo16(sum0a, sum1a);
+        const vec_t prod1 = vec_mullo16(sum0b, sum1b);
 #ifdef AVX512
-        const vec_t sum0a = _mm512_max_epi16(_mm512_min_epi16(inp0[i * 2], limit), zero);
-        const vec_t sum0b = _mm512_max_epi16(_mm512_min_epi16(inp0[i * 2 + 1], limit), zero);
-        const vec_t sum1a = _mm512_max_epi16(_mm512_min_epi16(inp1[i * 2], limit), zero);
-        const vec_t sum1b = _mm512_max_epi16(_mm512_min_epi16(inp1[i * 2 + 1], limit), zero);
-        const vec_t prod0 = _mm512_mullo_epi16(sum0a, sum1a);
-        const vec_t prod1 = _mm512_mullo_epi16(sum0b, sum1b);
         vec_t compacted =
             _mm512_packs_epi16(_mm512_srli_epi16(prod0, 7), _mm512_srli_epi16(prod1, shift));
         outp[i] = _mm512_permutexvar_epi64(_mm512_setr_epi64(0, 2, 4, 6, 1, 3, 5, 7), compacted);
 #elif defined(AVX2)
-        const vec_t sum0a = _mm256_max_epi16(_mm256_min_epi16(inp0[i * 2], limit), zero);
-        const vec_t sum0b = _mm256_max_epi16(_mm256_min_epi16(inp0[i * 2 + 1], limit), zero);
-        const vec_t sum1a = _mm256_max_epi16(_mm256_min_epi16(inp1[i * 2], limit), zero);
-        const vec_t sum1b = _mm256_max_epi16(_mm256_min_epi16(inp1[i * 2 + 1], limit), zero);
-        const vec_t prod0 = _mm256_mullo_epi16(sum0a, sum1a);
-        const vec_t prod1 = _mm256_mullo_epi16(sum0b, sum1b);
         vec_t compacted =
             _mm256_packs_epi16(_mm256_srli_epi16(prod0, shift), _mm256_srli_epi16(prod1, shift));
         outp[i] = _mm256_permute4x64_epi64(compacted, 0b11011000);
 #elif defined(SSE2)
-        const vec_t sum0a = _mm_max_epi16(_mm_min_epi16(inp0[i * 2], limit), zero);
-        const vec_t sum0b = _mm_max_epi16(_mm_min_epi16(inp0[i * 2 + 1], limit), zero);
-        const vec_t sum1a = _mm_max_epi16(_mm_min_epi16(inp1[i * 2], limit), zero);
-        const vec_t sum1b = _mm_max_epi16(_mm_min_epi16(inp1[i * 2 + 1], limit), zero);
-        const vec_t prod0 = _mm_mullo_epi16(sum0a, sum1a);
-        const vec_t prod1 = _mm_mullo_epi16(sum0b, sum1b);
         outp[i] = _mm_packs_epi16(_mm_srli_epi16(prod0, shift), _mm_srli_epi16(prod1, shift));
 #endif
     }
