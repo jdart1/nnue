@@ -84,10 +84,21 @@ using vec32_t = int32x4_t;
 static constexpr size_t VEC_ALIGN = 32;
 static constexpr size_t simdWidth = 128;
 static constexpr size_t simdRegCount = 16;
-static const vec_t ones128 = vdupq_n_s16(1);
-static const vec_t zeros128 = vdupq_n_s16(0);
-#else
-#error must set at least one of: AVX512, AVX2, SSSE3, SSE2 or NEON
+static inline vec_t vec_set_16(int16_t x) { return vdupq_n_s16(x); }
+static const vec_t ones128 = vec_set_16(1);
+static const vec_t zeros128 = vec_set_16(0);
+static const vec_t zero = zeros128;
+static inline vec_t vec_load(const vec_t *x) { return vld1q_s16(reinterpret_cast<const int16_t*>(x)); }
+static inline vec_t vec_add32(vec_t x, vec_t y) { return vaddq_s32(x, y); }
+static inline vec_t vec_clamp(vec_t x, vec_t maxValues) { return vminq_s16(vmaxq_s16(x, zero), maxValues); }
+static inline vec_t vec_mullo16(vec_t x, vec_t y) { return vmulq_s16(x,y); }
+static inline vec_t vec_madd16(vec_t x, vec_t y) {
+    const int32x4_t low = vmull_s16(vget_low_s16(x), vget_low_s16(y));
+    const int32x4_t high = vmull_high_s16(x, y);
+    return vpaddq_s32(low, high);
+}
+#else    
+    #error must set at least one of: AVX512, AVX2, SSSE3, SSE2 or NEON
 #endif
 
 #ifdef NEON
@@ -937,7 +948,7 @@ static inline void sqrCRelU(const InType *input, OutType *output) {
 static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
                                      const int clampMax, const WeightType *weights) {
     static_assert(sizeof(InType) == 2, "only 16bit is supported");
-#if !defined(NEON)
+    static_assert(inputSize*8 >= simdWidth && (inputSize*8) % simdWidth == 0,"width is not multiple of simdWidth");
     const vec_t maxValues = vec_set_16(clampMax);
     vec_t sum = zero;
     const vec_t *inp = reinterpret_cast<const vec_t*>(input);
@@ -950,6 +961,9 @@ static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
         sum = vec_add32(sum, y);
     }
     // horizontal add output register
+#ifdef NEON    
+    output[0] = add4x32_neon(sum);
+#else    
     output[0] = hsum_8x32(sum);
 #endif    
 }
@@ -959,7 +973,6 @@ template <typename InType, typename OutType, typename WeightType, size_t inputSi
 static inline void CRelUAndLinear(const InType *input, OutType *output,
                                   const int clampMax, const WeightType *weights) {
     static_assert(sizeof(InType) == 2, "only 16bit is supported");
-#if !defined(NEON)
     const vec_t maxValues = vec_set_16(clampMax);
     vec_t sum = zero;
     const vec_t *inp = reinterpret_cast<const vec_t*>(input);
@@ -971,6 +984,9 @@ static inline void CRelUAndLinear(const InType *input, OutType *output,
         sum = vec_add32(sum, vec_madd16(x, vec_load(w+i)));
     }
     // horizontal add output register
+#ifdef NEON    
+    output[0] = add4x32_neon(sum);
+#else    
     output[0] = hsum_8x32(sum);
 #endif    
 }
