@@ -59,15 +59,14 @@ class Network {
         std::cout << "accumulator:" << std::endl;
         std::cout << accum << std::endl;
 #endif
-        size_t lastOffset = 0;
         // evaluate the output layer, in the correct bucket
         outputLayer[bucket]->postProcessAccum(accum, reinterpret_cast<OutputType *>(buffer));
-        int32_t nnOut = reinterpret_cast<int32_t *>(buffer + lastOffset)[0];
+        int32_t nnOut = reinterpret_cast<int32_t *>(buffer)[0];
 #ifdef NNUE_TRACE
         std::cout << "NN output, after scaling: "
-                  << (nnOut * NETWORK_SCALE) / (NETWORK_QA * NETWORK_QB) << std::endl;
+                  << (nnOut * OUTPUT_SCALE) / (NETWORK_QA * NETWORK_QB) << std::endl;
 #endif
-       return (nnOut * NETWORK_SCALE) / (NETWORK_QA * NETWORK_QB);
+       return (nnOut * OUTPUT_SCALE) / (NETWORK_QA * NETWORK_QB);
     }
 
     friend std::istream &operator>>(std::istream &i, Network &);

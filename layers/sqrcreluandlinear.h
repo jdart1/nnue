@@ -64,6 +64,8 @@ class SqrCReLUAndLinear
                 }
                 offset += accum.getSize();
             }
+            // convert sum to a range that corrects for the squaring, i.e.
+            // what it would have if this were a regular CReLU layer
             output[0] = (sum / NETWORK_QA) + this->_biases[0];
         }
 #ifdef NNUE_TRACE
