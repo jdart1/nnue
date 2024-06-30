@@ -1,4 +1,4 @@
-// Copyright 2021 by Jon Dart. All Rights Reserved.
+// Copyright 2021, 2024 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_H
 #define _NNUE_H
 
@@ -8,6 +8,7 @@
 #include <cassert>
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 #include <memory>
 #include <array>
 #include <vector>
