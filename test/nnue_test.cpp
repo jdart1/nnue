@@ -631,12 +631,16 @@ int main(int argc, char **argv) {
     //    errs += test_CReLU<16>();
     //    errs += test_CReLU<32>();
     std::cerr << errs << " errors" << std::endl;
-
-    std::string fname;
+    std::string fname, fen;
     for (int arg = 1; arg < argc; ++arg) {
         if (*argv[arg] == '-') {
             char c = argv[arg][1];
             switch (c) {
+            case 'e':
+                if (++arg < argc) {
+                    fen = argv[arg];
+                }
+                break;
             case 'f':
                 if (++arg < argc) {
                     fname = argv[arg];
@@ -656,7 +660,7 @@ int main(int argc, char **argv) {
             std::cerr << "error loading " << fname << std::endl << ":" << strerror(errno) << std::flush;
         }
         else {
-            const std::string fen =
+            const std::string fen2test = (fen != "") ? fen :
                 "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
             Position p(fen);
             ChessInterface intf(&p);
