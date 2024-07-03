@@ -35,7 +35,7 @@ static int test_linear() {
     auto buf = std::unique_ptr<std::byte[]>(new std::byte[bufSize]);
 
     std::byte *b = buf.get();
-#ifdef STOCKFISH_FORMAT    
+#ifdef STOCKFISH_FORMAT
     BiasType *bb = reinterpret_cast<BiasType *>(b);
     for (size_t i = 0; i < COLS; i++) {
         *bb++ = biases[i] = (i%15) + i - 10;
@@ -62,7 +62,7 @@ static int test_linear() {
     for (size_t i = 0; i < COLS; i++) {
         *bb++ = biases[i] = (i%15) + i - 10;
     }
-#endif    
+#endif
 
     nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS> layer;
 
@@ -181,18 +181,9 @@ static int16_t col4[ArasanV3Feature::OutputSize];
 static int16_t zero_col[ArasanV3Feature::OutputSize] = {0};
 static int16_t biases[ArasanV3Feature::OutputSize];
 
-static int test_feature() {
-    const std::string fen =
-        "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
-
+static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexType> &w_expected,
+                        std::unordered_set<nnue::IndexType> &b_expected) {
     // ArasanV3Feature::FeatureXformer::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
-    for (size_t i = 0; i < ArasanV3Feature::OutputSize; i++) {
-         col1[i] = -200 + i;
-         col2[i] = 432 + i;
-         col3[i] = -591 + i;
-         col4[i] = -240 + i;
-         biases[i] = i % 4;
-    }
     /*
     for (size_t i = 0; i < nnue::PSQBuckets; i++) {
         psq1[i] = -200 + i;
@@ -201,48 +192,6 @@ static int test_feature() {
         psq4[i] = 23 + i;
     }
     */
-    std::unordered_set<nnue::IndexType> w_expected{
-                                                   199,
-                                                   195,
-                                                   321,
-                                                   10,
-                                                   137,
-                                                   17,
-                                                   30,
-                                                   413,
-                                                   24,
-                                                   422,
-                                                   36,
-                                                   483,
-                                                   288,
-                                                   686,
-                                                   620,
-                                                   426,
-                                                   424,
-                                                   434,
-                                                   753,
-                                                   635};
-    std::unordered_set<nnue::IndexType> b_expected{
-                                                   2175,
-                                                   2171,
-                                                   2297,
-                                                   1970,
-                                                   2097,
-                                                   1961,
-                                                   1958,
-                                                   1573,
-                                                   1952,
-                                                   1566,
-                                                   1948,
-                                                   1627,
-                                                   2200,
-                                                   1814,
-                                                   1748,
-                                                   1554,
-                                                   1552,
-                                                   1546,
-                                                   1865,
-                                                   1731};
 
     Position p(fen);
     ChessInterface intf(&p);
@@ -323,34 +272,6 @@ static int test_feature() {
         }
     }
 
-    // Test output layer
-    nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
-                            ArasanV3Feature::OutputSize * 2, 255> outputLayer;
-
-    int32_t out, out2;
-    outputLayer.postProcessAccum(accum, &out);
-    // compare output with generic implementation
-    size_t offset = 0;
-    int32_t sum = 0;
-    for (auto h : halves) {
-        for (size_t i = 0; i < accum.getSize(); ++i) {
-            int16_t x = accum.getOutput(h)[i];
-            // CReLU
-            x = std::clamp<int16_t>(x, 0, 255);
-            // multiply by weights and keep in 16-bit range
-            int16_t product = (x * outputLayer.getCol(0)[i + offset]) & 0xffff;
-            // square and sum
-            sum += product * x;
-        }
-        offset += accum.getSize();
-    }
-    out2 = (sum / nnue::NETWORK_QA) + *(feature.get()->getBiases());
-    if (out != out2) {
-        std::cerr << "error in output layer" << std::endl;
-        std::cerr << out << ' ' << out2 << std::endl;
-        ++errs;
-    }
-
     // test PSQ update
     /*
     ArasanV3Feature::FeatureXformer::PSQWeightType psq_expected[2][nnue::PSQBuckets];
@@ -391,8 +312,37 @@ static int test_feature() {
         std::cerr << "errors in layer 2: SqrCReLU" << std::endl;
     }
     */
+    // Test output layer
+    nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
+                            ArasanV3Feature::OutputSize * 2, 255> outputLayer;
+
+    int32_t out, out2;
+    outputLayer.postProcessAccum(accum, &out);
+    // compare output with generic implementation
+    size_t offset = 0;
+    int32_t sum = 0;
+    for (auto h : halves) {
+        for (size_t i = 0; i < accum.getSize(); ++i) {
+            int16_t x = accum.getOutput(h)[i];
+            // CReLU
+            x = std::clamp<int16_t>(x, 0, 255);
+            // multiply by weights and keep in 16-bit range
+            int16_t product = (x * outputLayer.getCol(0)[i + offset]) & 0xffff;
+            // square and sum
+            sum += product * x;
+        }
+        offset += accum.getSize();
+    }
+    out2 = (sum / nnue::NETWORK_QA) + *(feature.get()->getBiases());
+    if (out != out2) {
+        std::cerr << "error in output layer" << std::endl;
+        std::cerr << out << ' ' << out2 << std::endl;
+        ++errs;
+    }
+
     return errs;
 }
+
 
 template<nnue::Color c>
 static void getIndices(const ChessInterface &ci,
@@ -627,7 +577,22 @@ int main(int argc, char **argv) {
     errs += test_linear<16,16>();
     errs += test_linear<32,1>();
     errs += test_incremental();
-    errs += test_feature();
+    std::unordered_set<nnue::IndexType> w_expected{199, 195, 321, 10,  137, 17,  30,
+                                                   413, 24,  422, 36,  483, 288, 686,
+                                                   620, 426, 424, 434, 753, 635};
+    std::unordered_set<nnue::IndexType> b_expected{2175, 2171, 2297, 1970, 2097, 1961, 1958,
+                                                   1573, 1952, 1566, 1948, 1627, 2200, 1814,
+                                                   1748, 1554, 1552, 1546, 1865, 1731};
+    errs += testFeature("4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -", w_expected,
+                         b_expected);
+    std::unordered_set<nnue::IndexType> w_expected2{199, 194, 321, 269, 11,  10,  137, 8,   22,
+                                                    82,  17,  154, 422, 421, 548, 686, 427, 424,
+                                                    439, 500, 434, 433, 639, 763, 570, 632};
+    std::unordered_set<nnue::IndexType> b_expected2{
+        1407, 1402, 1529, 1461, 1203, 1202, 1329, 1200, 1198, 1258, 1193, 1314, 798,
+        797,  924,  1046, 787,  784,  783,  844,  778,  777,  967,  1091, 898,  960};
+    errs += testFeature("r3kb1r/p2n1pp1/1q2p2p/1ppb4/5B2/1P3NP1/2Q1PPBP/R4RK1 w kq -", w_expected2, b_expected2);
+
     //    errs += test_CReLU<16>();
     //    errs += test_CReLU<32>();
     std::cerr << errs << " errors" << std::endl;
