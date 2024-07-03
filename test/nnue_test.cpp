@@ -660,10 +660,10 @@ int main(int argc, char **argv) {
             std::cerr << "error loading " << fname << std::endl << ":" << strerror(errno) << std::flush;
         }
         else {
-            const std::string fen2test = (fen != "") ? fen :
-                "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
+            if (fen.empty()) fen = "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
             Position p(fen);
             ChessInterface intf(&p);
+            std::cout << "evaluating: " << fen << std::endl;
             int val = nnue::Evaluator<ChessInterface>::fullEvaluate(n,intf);
             std::cout << "value=" << val << std::endl;
         }
