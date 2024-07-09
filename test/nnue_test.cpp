@@ -325,11 +325,11 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
         for (size_t i = 0; i < accum.getSize(); ++i) {
             int16_t x = accum.getOutput(h)[i];
             // CReLU
-            x = std::clamp<int16_t>(x, 0, 255);
-            // multiply by weights and keep in 16-bit range
-            int16_t product = (x * outputLayer.getCol(0)[i + offset]) & 0xffff;
+            x = std::clamp<int16_t>(x, 0, nnue::NETWORK_QA);
+            // compute square (will not overflow)
+            int16_t x2 = (x * x);
             // square and sum
-            sum += product * x;
+            sum += (outputLayer.getCol(0)[i + offset] * x2);
         }
         offset += accum.getSize();
     }

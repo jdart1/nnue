@@ -92,12 +92,13 @@ static inline vec_t vec_load(const vec_t *x) { return vld1q_s16(reinterpret_cast
 static inline vec_t vec_add32(vec_t x, vec_t y) { return vaddq_s32(x, y); }
 static inline vec_t vec_clamp(vec_t x, vec_t maxValues) { return vminq_s16(vmaxq_s16(x, zero), maxValues); }
 static inline vec_t vec_mullo16(vec_t x, vec_t y) { return vmulq_s16(x,y); }
+static inline vec_t vec_mull16(vec_t x, vec_t y) { return vmulq_s16(x,y); }
 static inline vec_t vec_madd16(vec_t x, vec_t y) {
     const int32x4_t low = vmull_s16(vget_low_s16(x), vget_low_s16(y));
     const int32x4_t high = vmull_high_s16(x, y);
     return vpaddq_s32(low, high);
 }
-#else    
+#else
     #error must set at least one of: AVX512, AVX2, SSSE3, SSE2 or NEON
 #endif
 
@@ -260,7 +261,7 @@ static inline uint32_t hsum_8x32(__m128i x) {
     return _mm_cvtsi128_si32(sum32);       // SSE2 movd
 }
 #endif
-    
+
 #endif
 
 template <typename T, unsigned simdWidth> inline static constexpr size_t chunks(unsigned len) {
@@ -950,22 +951,24 @@ static inline void sqrCRelUAndLinear(const InType *input, OutType *output,
     static_assert(sizeof(InType) == 2, "only 16bit is supported");
     static_assert(inputSize*8 >= simdWidth && (inputSize*8) % simdWidth == 0,"width is not multiple of simdWidth");
     const vec_t maxValues = vec_set_16(clampMax);
+#ifdef NEON
+    vec32_t sum = zero;
+#else
     vec_t sum = zero;
+#endif
     const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+    const vec_t *w = reinterpret_cast<const vec_t *>(weights);
     constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
     for (size_t i = 0; i < iterations; ++i) {
-        const vec_t *w = reinterpret_cast<const vec_t *>(weights);
         vec_t x = vec_clamp(vec_load(inp + i), maxValues);
-        vec_t y = vec_mullo16(x, vec_load(w + i));
-        y = vec_madd16(x, y);
-        sum = vec_add32(sum, y);
+        sum = vec_add32(sum, vec_madd16(vec_mullo16(x,x), vec_load(w+i)));
     }
     // horizontal add output register
-#ifdef NEON    
+#ifdef NEON
     output[0] = add4x32_neon(sum);
-#else    
+#else
     output[0] = hsum_8x32(sum);
-#endif    
+#endif
 }
 
 // Combination of CRelU activation and a linear layer with 1-dimensional output.
@@ -984,11 +987,11 @@ static inline void CRelUAndLinear(const InType *input, OutType *output,
         sum = vec_add32(sum, vec_madd16(x, vec_load(w+i)));
     }
     // horizontal add output register
-#ifdef NEON    
+#ifdef NEON
     output[0] = add4x32_neon(sum);
-#else    
+#else
     output[0] = hsum_8x32(sum);
-#endif    
+#endif
 }
 
 } // namespace simd

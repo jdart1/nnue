@@ -57,10 +57,10 @@ class SqrCReLUAndLinear
                     int16_t x = accum.getOutput(h)[i];
                     // CReLU
                     x = std::clamp<int16_t>(x, 0, clampMax);
-                    // multiply by weights and keep in 16-bit range
-                    int16_t product = (x * this->_weights[0][i + offset]) & 0xffff;
+                    // compute square (will not overflow)
+                    int16_t x2 = (x * x);
                     // square and sum
-                    sum += product * x;
+                    sum += (this->_weights[0][i + offset] * x2);
                 }
                 offset += accum.getSize();
             }

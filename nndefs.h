@@ -24,8 +24,11 @@ static constexpr IndexType LAST_INDEX = 1000000;
 // Quantization factors
 
 // input quantization, i.e. 0..1 in float domain is
-// 0 .. NETWORK_QA in integer domain
-static constexpr int NETWORK_QA = 255;
+// 0 .. NETWORK_QA in integer domain. This is set
+// to the square root of 181, so we can square
+// inputs without overflowing the 16-bit integer
+// range (idea from Peacekeeper)
+static constexpr int NETWORK_QA = 181;
 // weight quantization, i.e. resolution of the weights. Weight of 1 in
 // integer domain has NETWORK_QB levels
 static constexpr int NETWORK_QB = 64;
