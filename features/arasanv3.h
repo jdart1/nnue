@@ -22,6 +22,7 @@ public:
 
     template <Color kside>
     inline static IndexType getIndex(Square kp /* kside King */, Piece p, Square sq) {
+        //Square orig = sq;
         assert(p != EmptyPiece);
         if (kp % 8 >= E_FILE) {
             // flip file
@@ -31,6 +32,8 @@ public:
             sq ^= 56;
             kp ^= 56;
         }
+
+        //        std::cout << "orig=" << orig << " sq=" << sq << " type=" << (int)typeOfPiece(p) << " color=" << ((colorOfPiece(p) == nnue::White) ? "White" : "Black") << " index=" << ((kside != colorOfPiece(p)) ? "0" : "1") << " mapped=" << pieceTypeMap[kside != colorOfPiece(p)][p] << std::endl;
         IndexType idx = static_cast<IndexType>(kingBucketsMap[kp] * 12 * 64 +
                                                pieceTypeMap[kside != colorOfPiece(p)][p] * 64 +
                                                sq);
@@ -97,9 +100,6 @@ public:
             }
         }
 #else
-#ifdef NNUE_TRACE
-        std::cout << "weights" << std::endl;
-#endif
         // weights first
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
             for (size_t j = 0; j < outputSize && s.good(); ++j) {
@@ -109,7 +109,9 @@ public:
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
         }
-        std::cout << std::endl;
+#endif
+#ifdef _DEBUG
+        if (!s.good()) std::cout << strerror(errno) << std::endl;
 #endif
         return s;
     }
