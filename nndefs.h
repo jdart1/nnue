@@ -2,9 +2,6 @@
 #ifndef _NNUE_NNDEFS_H
 #define _NNUE_NNDEFS_H
 
-// If set, assume serialized network format used by nnue-pytorch
-//#define STOCKFISH_FORMAT
-
 #ifdef AVX512
 static constexpr size_t DEFAULT_ALIGN = 64;
 #else

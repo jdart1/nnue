@@ -66,7 +66,6 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
 
     virtual std::istream &read(std::istream &s) {
         // Note: linear layers are stored in column order
-#ifdef STOCKFISH_FORMAT
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
         }
@@ -75,16 +74,6 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
                 _weights[i][j] = read_little_endian<WeightType>(s);
             }
         }
-#else
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            for (size_t j = 0; j < roundedInputSize && s.good(); ++j) {
-                _weights[i][j] = read_little_endian<WeightType>(s);
-            }
-        }
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            _biases[i] = read_little_endian<BiasType>(s);
-        }
-#endif
         return s;
     }
 

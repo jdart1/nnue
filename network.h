@@ -103,7 +103,6 @@ class Network {
 };
 
 inline std::istream &operator>>(std::istream &s, Network &network) {
-#ifdef STOCKFISH_FORMAT
     std::uint32_t version, size;
     version = read_little_endian<uint32_t>(s);
     // TBD: validate hash
@@ -125,11 +124,9 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
         str << c;
     }
     network.architecture = str.str();
-#endif
     // read feature layer
     (void)network.transformer->read(s);
     // read num buckets x layers
-#ifdef STOCKFISH_FORMAT
     unsigned n = 0;
     for (size_t i = 0; i < OutputBuckets && s.good(); ++i) {
         // skip next 4 bytes (hash)
@@ -140,40 +137,6 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
     if (n != OutputBuckets) {
         s.setstate(std::ios::failbit);
     }
-#else
-    // input format used by Obsidian
-    constexpr size_t width = 2 * Network::FeatureXformerOutputSize;
-    int16_t *outputWeights = new int16_t[width * OutputBuckets];
-    s.read(reinterpret_cast<char *>(outputWeights), sizeof(int16_t) * width * OutputBuckets);
-    if (s.good()) {
-        // assume output size 1
-        for (size_t b = 0; b < OutputBuckets; ++b) {
-            int16_t column[width];
-            for (size_t i = 0; i < width; ++i) {
-                column[i] = outputWeights[i * OutputBuckets + b];
-            }
-            network.outputLayer[b]->setCol(0, column);
-        }
-    }
-    delete[] outputWeights;
-    int16_t outputBiases[OutputBuckets];
-    s.read(reinterpret_cast<char *>(outputBiases), sizeof(int16_t) * OutputBuckets);
-    if (s.good()) {
-#ifdef NNUE_TRACE
-        std::cout << "biases" << std::endl;
-#endif
-        for (size_t b = 0; b < OutputBuckets; ++b) {
-            // assumes output of layer is size 1
-            network.outputLayer[b]->setBiases(&outputBiases[b]);
-#ifdef NNUE_TRACE
-            std::cout << outputBiases[b] << ' ';
-#endif
-        }
-#ifdef NNUE_TRACE
-        std::cout << std::endl;
-#endif
-    }
-#endif
     return s;
 }
 

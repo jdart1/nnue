@@ -35,7 +35,6 @@ static int test_linear() {
     auto buf = std::unique_ptr<std::byte[]>(new std::byte[bufSize]);
 
     std::byte *b = buf.get();
-#ifdef STOCKFISH_FORMAT
     BiasType *bb = reinterpret_cast<BiasType *>(b);
     for (size_t i = 0; i < COLS; i++) {
         *bb++ = biases[i] = (i%15) + i - 10;
@@ -48,21 +47,6 @@ static int test_linear() {
             *w++ = weights[i][j] = ((i+j) % 20) - 10;
         }
     }
-#else
-    // weights first
-    WeightType *w = reinterpret_cast<WeightType*>(b);
-    // serialized in column order
-    for (size_t i = 0; i < COLS; i++) {
-        for (size_t j = 0; j < ROUNDED_ROWS; j++) {
-            *w++ = weights[i][j] = ((i+j) % 20) - 10;
-        }
-    }
-    b += COLS*ROUNDED_ROWS*sizeof(WeightType);
-    BiasType *bb = reinterpret_cast<BiasType *>(b);
-    for (size_t i = 0; i < COLS; i++) {
-        *bb++ = biases[i] = (i%15) + i - 10;
-    }
-#endif
 
     nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS> layer;
 
