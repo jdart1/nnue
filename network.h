@@ -23,7 +23,7 @@ class Network {
     using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
     using OutputLayer = SqrCReLUAndLinear<AccumulatorType, int16_t, int16_t, int16_t, OutputType,
-                                          FeatureXformerOutputSize * 2, 255>;
+                                          FeatureXformerOutputSize * 2, nnue::NETWORK_QA>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
