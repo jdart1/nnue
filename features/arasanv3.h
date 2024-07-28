@@ -32,8 +32,6 @@ public:
             sq ^= 56;
             kp ^= 56;
         }
-
-        //        std::cout << "orig=" << orig << " sq=" << sq << " type=" << (int)typeOfPiece(p) << " color=" << ((colorOfPiece(p) == nnue::White) ? "White" : "Black") << " index=" << ((kside != colorOfPiece(p)) ? "0" : "1") << " mapped=" << pieceTypeMap[kside != colorOfPiece(p)][p] << std::endl;
         IndexType idx = static_cast<IndexType>(kingBucketsMap[kp] * 12 * 64 +
                                                pieceTypeMap[kside != colorOfPiece(p)][p] * 64 +
                                                sq);
@@ -43,20 +41,23 @@ public:
 
     // Full update: propagate data through the layer, updating the specified half of the
     // accumulator (side to move goes in lower half).
-    void updateAccum(const IndexArray &indices, AccumulatorHalf half, AccumulatorType &output) const noexcept {
-        //#ifdef SIMD
-        //        simd::fullUpdate<OutputType,WeightType,BiasType,inputSize,outputSize>(output.data(half), &_weights, &_biases, indices.data());
-        //#else
-        output.init_half(half,this->_biases);
+    void updateAccum(const IndexArray &indices, AccumulatorHalf half,
+                     AccumulatorType &output) const noexcept {
+#ifdef SIMD
+        simd::fullUpdate<OutputType, WeightType, BiasType, inputSize, outputSize>(
+            output.data(half), &_weights, &_biases, indices.data());
+#else
+        output.init_half(half, this->_biases);
         for (auto it = indices.begin(); it != indices.end() && *it != LAST_INDEX; ++it) {
 #ifdef NNUE_TRACE
             std::cout << "index " << *it << " adding weights ";
-            for (size_t i = 0; i < 20; ++i) std::cout << this->_weights[*it][i] << ' ';
+            for (size_t i = 0; i < 20; ++i)
+                std::cout << this->_weights[*it][i] << ' ';
             std::cout << "to side " << (half == AccumulatorHalf::Lower ? 0 : 1) << std::endl;
 #endif
-            output.add_half(half,this->_weights[*it]);
+            output.add_half(half, this->_weights[*it]);
         }
-        //#endif
+#endif
     }
 
     // Perform an incremental update
@@ -67,7 +68,6 @@ public:
 #ifdef SIMD
         simd::update<OutputType,WeightType,inputSize,outputSize>(source.getOutput(sourceHalf),target.data(targetHalf),_weights,
                                                                  added.data(), added_count, removed.data(), removed_count);
-
 #else
         target.copy_half(targetHalf,source,sourceHalf);
         updateAccum(added,removed,added_count,removed_count,targetHalf,target);
