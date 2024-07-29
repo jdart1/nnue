@@ -95,6 +95,10 @@ class Network {
         return version;
     }
 
+    FeatureXformer *getTransformer() const noexcept {
+        return transformer;
+    }
+
   protected:
     FeatureXformer *transformer;
     OutputLayer *outputLayer[OutputBuckets];

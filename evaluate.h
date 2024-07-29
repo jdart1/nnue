@@ -1,4 +1,4 @@
-// Copyright 2021-2023 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2024 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_EVALUATE_H
 #define _NNUE_EVALUATE_H
 
@@ -112,13 +112,13 @@ public:
             Piece piece;
             ci.getDirtyState(0,from,to,piece);
             if (isKing(piece) || (gain -= dn + 1) < 0) {
-                // King was moved, can't incrementally update, or no
-                // gain fron incremental update
+                // king move invalidates accumulator
                 incrementalOk = false;
                 break;
             }
             // This accumulator has no data, try previous
             if (!ci.previous()) break;
+            half = static_cast<AccumulatorHalf>(1 - static_cast<int>(half));
         }
         if (incrementalOk && ci.getAccumulator().getState(half) == AccumulatorState::Computed) {
             // a previous position was found with usable data
@@ -155,7 +155,6 @@ public:
         return (intf.pieceCount() - 2)/4;
     }
 
-private:
     // full evaluation of accumulator, update into 3rd argument
     static void updateAccum(const Network &network, ChessInterface &intf, Network::AccumulatorType &accum) {
         const Color colors[] = {White, Black};

@@ -22,6 +22,7 @@ LD = $(CXX)
 #LDFLAGS = -fuse-ld=gold
 #LDFLAGS =  -fsanitize=address -fsanitize=bounds-strict
 DEBUG = -ggdb
+LDFLAGS = $(DEBUG)
 
 BUILD = build
 EXPORT = build

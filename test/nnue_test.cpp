@@ -2,16 +2,20 @@
 #include "nnue.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cstdio>
+#include <initializer_list>
 #include <fstream>
 #include <iostream>
 #include <random>
 #include <set>
+#include <vector>
 #include <unordered_map>
 #include <unordered_set>
 
+#include "../interface/chessint.h"
 #include "../interface/chessint.h"
 
 // Unit tests for nnue code
@@ -167,16 +171,6 @@ static int16_t biases[ArasanV3Feature::OutputSize];
 
 static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexType> &w_expected,
                         std::unordered_set<nnue::IndexType> &b_expected) {
-    // ArasanV3Feature::FeatureXformer::PSQWeightType psq1[nnue::PSQBuckets], psq2[nnue::PSQBuckets], psq3[nnue::PSQBuckets], psq4[nnue::PSQBuckets];
-    /*
-    for (size_t i = 0; i < nnue::PSQBuckets; i++) {
-        psq1[i] = -200 + i;
-        psq2[i] = 71 + i;
-        psq3[i] = -50 + i;
-        psq4[i] = 23 + i;
-    }
-    */
-
     Position p(fen);
     ChessInterface intf(&p);
 
@@ -256,46 +250,6 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
         }
     }
 
-    // test PSQ update
-    /*
-    ArasanV3Feature::FeatureXformer::PSQWeightType psq_expected[2][nnue::PSQBuckets];
-    for (size_t i = 0; i < nnue::PSQBuckets; ++i) {
-        psq_expected[0][i] = psq3[i] + psq4[i];
-        psq_expected[1][i] = psq1[i] + psq2[i];
-    }
-    std::vector<nnue::AccumulatorHalf> halfs = {nnue::AccumulatorHalf::Lower,
-        nnue::AccumulatorHalf::Upper};
-    for (auto half : halfs) {
-        for (size_t i = 0; i < nnue::PSQBuckets; ++i) {
-            auto expect = psq_expected[half == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
-            if (expect != accum.getPSQ(half)[i]) {
-                ++errs;
-                std::cerr << " error at psq index " << int(i)
-                          << " expected: " << expected << " actual "
-                          << accum.getPSQ(half)[i] << std::endl;
-            }
-        }
-    }
-
-    nnue::SqrCReLU<int16_t, ArasanV3Feature::AccumulatorType, uint8_t, 1024, 127, 7> outputTransform;
-
-#ifdef AVX512
-    alignas(64) uint8_t out[ArasanV3Feature::OutputSize];
-#else
-    alignas(nnue::DEFAULT_ALIGN) uint8_t out[ArasanV3Feature::OutputSize];
-#endif
-    outputTransform.postProcessAccum(accum,out);
-
-    static const uint8_t expected2[ArasanV3Feature::OutputSize] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,3,6,9,8,11,14,17,16,19,22,25,24,27,30,33,32,35,38,41,40,43,46,49,48,51,54,57,56,59,62,65,64,67,70,73,72,75,78,81,80,83,86,89,88,91,94,97,96,99,102,105,104,107,110,113,112,115,118,121,120,123,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,126,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-
-    int tmp_err = errs;
-    for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
-        if (out[i] != expected2[i]) ++errs;
-    }
-    if (errs != tmp_err) {
-        std::cerr << "errors in layer 2: SqrCReLU" << std::endl;
-    }
-    */
     // Test output layer
     nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
                             ArasanV3Feature::OutputSize * 2, 255> outputLayer;
@@ -330,8 +284,8 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
 
 template<nnue::Color c>
 static void getIndices(const ChessInterface &ci,
-                       nnue::IndexArray &a,
                        std::set<nnue::IndexType> &indices) {
+    nnue::IndexArray a;
     nnue::Evaluator<ChessInterface>::getIndices<c>(ci,a);
     for (auto it = a.begin(); it != a.end() && *it != nnue::LAST_INDEX; it++) {
         indices.insert(*it);
@@ -344,182 +298,113 @@ static void getSetDiff(const std::set<nnue::IndexType> &a, const std::set<nnue::
     std::set_difference(a.begin(),a.end(),b.begin(),b.end(),std::inserter(out, out.end()));
 }
 
-static void getIndexDiffs(nnue::Evaluator<ChessInterface> evaluator, nnue::Color c,
-                          const ChessInterface &ciSource, const ChessInterface &ciTarget,
-                          std::set<nnue::IndexType> &added, std::set<nnue::IndexType> &removed) {
-    nnue::IndexArray addedArray, removedArray;
-    size_t addedCount, removedCount;
-    evaluator.getIndexDiffs(ciSource, ciTarget, c, addedArray, removedArray,
-                            addedCount, removedCount);
-    for (size_t i = 0; i < addedCount; ++i) {
-        added.insert(addedArray[i]);
-    }
-    for (size_t i = 0; i < removedCount; ++i) {
-        removed.insert(removedArray[i]);
-    }
-    // diff algorithm may place items in both removed and added
-    // lists. Filter these out.
-    std::vector<nnue::IndexType> intersect(32);
-    std::set_intersection(
-        removed.begin(), removed.end(), added.begin(), added.end(),
-        std::back_inserter(intersect));
-    for (auto x : intersect) {
-        added.erase(x);;
-        removed.erase(x);
-    }
-}
-
-static int test_incr(ChessInterface &ciSource, ChessInterface &ciTarget) {
+static int test_incr(const nnue::Network &network, int casenum, ChessInterface &ciSource, ChessInterface &ciTarget) {
     int errs = 0;
     assert(ciSource != ciTarget);
 
-    std::set<nnue::IndexType> baseW, baseB, targetW, targetB;
-    nnue::IndexArray wIndicesSource, bIndicesSource, wIndicesTarget,
-        bIndicesTarget;
-    getIndices<nnue::White>(ciSource,wIndicesSource,baseW);
-    getIndices<nnue::Black>(ciSource,bIndicesSource,baseB);
-    getIndices<nnue::White>(ciTarget,wIndicesTarget,targetW);
-    getIndices<nnue::Black>(ciTarget,bIndicesTarget,targetB);
-
-    std::set<nnue::IndexType> addedW, addedB, removedW, removedB;
-    getSetDiff(baseW, targetW, removedW);
-    getSetDiff(baseB, targetB, removedB);
-    getSetDiff(targetW, baseW, addedW);
-    getSetDiff(targetB, baseB, addedB);
-
     nnue::Evaluator<ChessInterface> evaluator;
 
-    nnue::Network network;
+    // do full calculation for target
+    nnue::Network::AccumulatorType fullEvalAccum;
+    nnue::IndexArray wIndices, bIndices;
+    nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(ciTarget,wIndices);
+    nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(ciTarget,bIndices);
+    nnue::Evaluator<ChessInterface>::updateAccum(network, ciTarget, fullEvalAccum);
 
-    // have Evaluator calculate index diffs
-    std::set<nnue::IndexType> addedFromEvaluatorW,
-        addedFromEvaluatorB,
-        removedFromEvaluatorW,
-        removedFromEvaluatorB;
-
-    getIndexDiffs(evaluator,nnue::White,ciSource,ciTarget,addedFromEvaluatorW,removedFromEvaluatorW);
-    getIndexDiffs(evaluator,nnue::Black,ciSource,ciTarget,addedFromEvaluatorB,removedFromEvaluatorB);
-
-    if (addedW != addedFromEvaluatorW) {
-        ++errs;
-        std::cerr << "added list differs (W)" << std::endl;
-    }
-    if (addedB != addedFromEvaluatorB) {
-        ++errs;
-        std::cerr << "added list differs (B)" << std::endl;
-    }
-    if (removedW != removedFromEvaluatorW) {
-        ++errs;
-        std::cerr << "removed list differs (W)" << std::endl;
-    }
-    if (removedB != removedFromEvaluatorB) {
-        ++errs;
-        std::cerr << "removed list differs (B)" << std::endl;
-    }
-
-    ArasanV3Feature feature;
-
-    ArasanV3Feature::AccumulatorType accum;
-
-    // set some weights
-    for (size_t i = 0; i < ArasanV3Feature::InputSize; i++) {
-        ArasanV3Feature::OutputType col[ArasanV3Feature::OutputSize];
-        for (size_t j = 0; j < ArasanV3Feature::OutputSize; j++) {
-            col[j] = (i + j) % 10 - 5;
-        }
-        feature.get()->setCol(i, col);
-    }
-
-    // Full evaluation of feature transformer for source position
-    evaluator.updateAccum(network, wIndicesSource, nnue::White, ciSource.sideToMove(),
-                          ciSource.getAccumulator());
-    evaluator.updateAccum(network, bIndicesSource, nnue::Black, ciSource.sideToMove(),
-                          ciSource.getAccumulator());
-
-    // Full evaluation of feature transformer for target position into "accum"
-    evaluator.updateAccum(network, wIndicesTarget, nnue::White, ciTarget.sideToMove(),
-                          accum);
-    evaluator.updateAccum(network, bIndicesTarget, nnue::Black, ciTarget.sideToMove(),
-                          accum);
-
-    assert(ciTarget.getAccumulator().getState(nnue::AccumulatorHalf::Lower) ==
-           nnue::AccumulatorState::Empty);
-    assert(ciTarget.getAccumulator().getState(nnue::AccumulatorHalf::Upper) ==
-           nnue::AccumulatorState::Empty);
-
-    // Incremental evaluation of 1st layer, starting from source position
-    evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::White);
-    evaluator.updateAccumIncremental(network, ciSource, ciTarget, nnue::Black);
-
-    // Compare incremental and full eval
-    auto old_errs = errs;
-    errs += ciTarget.getAccumulator() != accum;
-    if (errs != old_errs) {
-        std::cerr << "accumulator mismatch after incremental eval" << std::endl;
-    }
-
-    // Reset target accumulator state
+    // do incremental update if possible
     ciTarget.getAccumulator().setEmpty();
-
-    // use the API that takes incremental or regular path
     evaluator.updateAccum(network, ciTarget, nnue::White);
     evaluator.updateAccum(network, ciTarget, nnue::Black);
 
-    // Compare results again
-    old_errs = errs;
-    errs += ciTarget.getAccumulator() != accum;
-    if (errs != old_errs) {
-        std::cerr << "accumulator mismatch after regular/incremental eval" << std::endl;
+    int tmp = errs;
+    errs += ciTarget.getAccumulator() != fullEvalAccum;
+    if (errs - tmp) {
+        std::cout << "test_incr: error in case " << casenum << " standard/incremental update differs" << std::endl;
     }
 
     return errs;
 }
 
 static int test_incremental() {
-    constexpr auto source_fen =
-        "r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B1K2R b KQkq -";
 
-    constexpr auto target_fen =
-        "r1bqk2r/pp1n1ppp/2pbpn2/8/2pP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQkq -";
+    struct ChangeRecord {
+        // fen is position after the change described in the DirtyState(s)
+        ChangeRecord(const std::string &f, const std::vector<DirtyState> &c) :
+            fen(f) {
+            std::copy(c.begin(),c.end(),std::back_inserter(changes));
+        }
+        std::string fen;
+        std::vector<DirtyState> changes;
+    };
 
-    constexpr auto target2_fen =
-        "r1bqk2r/pp1n1ppp/2pbpn2/8/2BP4/2N1PN2/PPQ2PPP/R1B1K2R b KQkq -";
+    struct Case {
+        Case() = default;
+
+        Case(std::initializer_list<ChangeRecord> x) {
+            Position *prev = nullptr;
+            for (const auto &cr : x) {
+                Position *pos = new Position(cr.fen);
+                pos->previous = prev;
+                for (const auto &it : cr.changes) {
+                    pos->dirty[pos->dirty_num++] = it;
+                }
+                pos_list.push_back(pos);
+                prev = pos;
+            }
+        }
+        virtual ~Case() {
+            auto it = pos_list.end();
+            while (it != pos_list.begin()) {
+                --it;
+                Position *p = *it;
+                it = pos_list.erase(it);
+                delete p;
+            }
+        }
+
+        std::vector<Position *> pos_list;
+    };
+
+    const std::array<Case, 4> cases = {
+        Case{ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B1K2R b KQkq -", {}),
+             ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/8/2pP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQkq -",
+                          {DirtyState(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn),
+                           DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::WhitePawn)})},
+        Case{ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B1K2R b KQkq -", {}),
+             ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/8/2pP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQkq -",
+                          {DirtyState(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn),
+                           DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::WhitePawn)}),
+             ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/8/2BP4/2N1PN2/PPQ2PPP/R1B1K2R b KQkq -",
+                          {DirtyState(12 /*E2*/, 26 /*C4*/, nnue::WhiteBishop),
+                           DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::BlackPawn)})},
+        Case{ChangeRecord("8/8/7k/5P2/1N3K1p/2P5/8/4n3 w - -", {}),
+             ChangeRecord("8/8/7k/5P2/1N4Kp/2P5/8/4n3 b - -",
+                          {DirtyState(29 /*F4*/, 30 /*G4*/, nnue::WhiteKing)})},
+        Case{ChangeRecord("8/6k1/7p/3N1P2/3K4/2P5/8/4n3 w - -",{}),
+             ChangeRecord("8/6k1/7p/3N1P2/4K3/2P5/8/4n3 b - -",
+                          {DirtyState(27 /*D4*/, 28 /*E4*/, nnue::WhiteKing)})}};
+
+    nnue::Network network;
+
+    // set some weights
+    for (size_t i = 0; i < nnue::Network::FeatureXformerRows; i++) {
+        ArasanV3Feature::OutputType col[nnue::Network::FeatureXformerOutputSize];
+        for (size_t j = 0; j < nnue::Network::FeatureXformerOutputSize; j++) {
+            col[j] = (i + j) % 10 - 5;
+        }
+        network.getTransformer()->setCol(i, col);
+    }
 
     int errs = 0;
 
-    ArasanV3Feature featureXformer;
-
-    Position source_pos(source_fen);
-    ChessInterface ciSource(&source_pos);
-    Position target_pos(target_fen);
-    ChessInterface ciTarget(&target_pos);
-    // set up dirty status
-    // d5 pawn x c4 pawn
-    target_pos.dirty[target_pos.dirty_num++] =
-        DirtyState(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn);
-    target_pos.dirty[target_pos.dirty_num++] =
-        DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::WhitePawn);
-    // connect target to previous position
-    target_pos.previous = &source_pos;
-
-    // test incremental update
-    errs += test_incr(ciSource, ciTarget);
-
-    Position target2_pos(target2_fen);
-
-    // Try a position 2 half-moves ahead
-    target2_pos.dirty[target2_pos.dirty_num++] =
-        DirtyState(12 /*E2*/, 26 /*C4*/, nnue::WhiteBishop);
-    target2_pos.dirty[target2_pos.dirty_num++] =
-        DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::BlackPawn);
-    target2_pos.previous = &target_pos;
-    ChessInterface ciTarget2(&target2_pos);
-
-    ciTarget.getAccumulator().setEmpty();
-    ciTarget2.getAccumulator().setEmpty();
-
-    errs += test_incr(ciSource, ciTarget2);
-
+    int i = 0;
+    for (const auto &c : cases) {
+        Position *source_pos  = c.pos_list.front();
+        ChessInterface ciSource(source_pos);
+        Position *target_pos = c.pos_list.back();
+        ChessInterface ciTarget(target_pos);
+        errs += test_incr(network, i++, ciSource, ciTarget);
+    }
     return errs;
 }
 
