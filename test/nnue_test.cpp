@@ -292,12 +292,6 @@ static void getIndices(const ChessInterface &ci,
     }
 }
 
-static void getSetDiff(const std::set<nnue::IndexType> &a, const std::set<nnue::IndexType> &b,
-                       std::set<nnue::IndexType> &out) {
-    out.clear();
-    std::set_difference(a.begin(),a.end(),b.begin(),b.end(),std::inserter(out, out.end()));
-}
-
 static int test_incr(const nnue::Network &network, int casenum, ChessInterface &ciSource, ChessInterface &ciTarget) {
     int errs = 0;
     assert(ciSource != ciTarget);
@@ -365,7 +359,7 @@ static int test_incremental() {
         std::vector<Position *> pos_list;
     };
 
-    const std::array<Case, 4> cases = {
+    const std::array<Case, 3> cases = {
         Case{ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B1K2R b KQkq -", {}),
              ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/8/2pP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQkq -",
                           {DirtyState(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn),
@@ -377,12 +371,15 @@ static int test_incremental() {
              ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/8/2BP4/2N1PN2/PPQ2PPP/R1B1K2R b KQkq -",
                           {DirtyState(12 /*E2*/, 26 /*C4*/, nnue::WhiteBishop),
                            DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::BlackPawn)})},
-        Case{ChangeRecord("8/8/7k/5P2/1N3K1p/2P5/8/4n3 w - -", {}),
-             ChangeRecord("8/8/7k/5P2/1N4Kp/2P5/8/4n3 b - -",
-                          {DirtyState(29 /*F4*/, 30 /*G4*/, nnue::WhiteKing)})},
-        Case{ChangeRecord("8/6k1/7p/3N1P2/3K4/2P5/8/4n3 w - -",{}),
+        Case{ChangeRecord("8/6k1/7p/3N1P2/3K4/2P5/8/4n3 b - -", {}),
+             ChangeRecord("8/6k1/7p/3N1P2/3K4/2P2n2/8/8 w - -",
+                          {DirtyState(4 /*E1*/, 21 /*F3*/, nnue::BlackKnight)}),
              ChangeRecord("8/6k1/7p/3N1P2/4K3/2P5/8/4n3 b - -",
-                          {DirtyState(27 /*D4*/, 28 /*E4*/, nnue::WhiteKing)})}};
+                          {DirtyState(27 /*D4*/, 28 /*E4*/, nnue::WhiteKing)}),
+             ChangeRecord("8/6k1/7p/3N1P2/4K3/2P5/3n4/8 w - -",
+                          {DirtyState(21 /*F3*/, 11 /*D2*/, nnue::BlackKnight)}),
+             ChangeRecord("8/6k1/7p/3N1P2/8/2P1K3/3n4/8 b - -",
+                          {DirtyState(21 /*E4*/, 11 /*E3*/, nnue::WhiteKing)})}};
 
     nnue::Network network;
 
