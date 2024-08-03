@@ -359,7 +359,7 @@ static int test_incremental() {
         std::vector<Position *> pos_list;
     };
 
-    const std::array<Case, 3> cases = {
+    const std::array<Case, 5> cases = {
         Case{ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B1K2R b KQkq -", {}),
              ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/8/2pP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQkq -",
                           {DirtyState(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn),
@@ -379,7 +379,23 @@ static int test_incremental() {
              ChangeRecord("8/6k1/7p/3N1P2/4K3/2P5/3n4/8 w - -",
                           {DirtyState(21 /*F3*/, 11 /*D2*/, nnue::BlackKnight)}),
              ChangeRecord("8/6k1/7p/3N1P2/8/2P1K3/3n4/8 b - -",
-                          {DirtyState(21 /*E4*/, 11 /*E3*/, nnue::WhiteKing)})}};
+                          {DirtyState(21 /*E4*/, 11 /*E3*/, nnue::WhiteKing)})},
+        Case{ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P1Q5/8/5nPP/1q4K1 w - -",{}),
+             ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P7/8/5nPP/1q3QK1 b - -",
+                          {DirtyState(26 /*C4*/, 5 /*F1*/, nnue::WhiteQueen)}),
+             ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P7/8/5nPP/5qK1 w - -",
+                          {DirtyState(1 /*B1*/, 5 /*F1*/, nnue::BlackQueen),
+                           DirtyState(5 /*F1*/, nnue::InvalidSquare, nnue::WhiteQueen)}),
+             ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P7/8/5nPP/5qK1 w - -",
+                          {DirtyState(26 /*C4*/, 5 /*F1*/, nnue::WhiteQueen)}),
+             ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P7/8/5nPP/5qK1 w - -",
+                          {DirtyState(6 /*G1*/, 5 /*F1*/,nnue::BlackKing)})},
+        Case{ChangeRecord("2Q2r1k/3n2p1/p6p/4p1B1/P1Q5/2N5/2q2nPP/R5K1 w - -",{}),
+             ChangeRecord("5Q1k/3n2p1/p6p/4p1B1/P1Q5/2N5/2q2nPP/R5K1 b - -",
+                          {DirtyState(58 /*C8*/, 60 /*F8*/, nnue::WhiteQueen),
+                           DirtyState(60 /*F8*/, nnue::InvalidSquare, nnue::BlackRook)}),
+             ChangeRecord("5Q2/3n2pk/p6p/4p1B1/P1Q5/2N5/2q2nPP/R5K1 w - -",
+                          {DirtyState(63 /*H8*/, 55 /*H7*/, nnue::BlackKing)})}};
 
     nnue::Network network;
 

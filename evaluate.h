@@ -111,14 +111,13 @@ public:
             Square from, to;
             Piece piece;
             ci.getDirtyState(0,from,to,piece);
-            if (isKing(piece) || (gain -= dn + 1) < 0) {
-                // king move invalidates accumulator
+            if ((isKing(piece) && Network::FeatureXformer::needsRefresh(c,from,to)) || (gain -= dn + 1) < 0) {
+                // king move invalidates accumulator, or no gain from incremental update
                 incrementalOk = false;
                 break;
             }
-            // This accumulator has no data, try previous
             if (!ci.previous()) break;
-            half = static_cast<AccumulatorHalf>(1 - static_cast<int>(half));
+            half = ci.getAccumulator().getHalf(ci.sideToMove(),c);
         }
         if (incrementalOk && ci.getAccumulator().getState(half) == AccumulatorState::Computed) {
             // a previous position was found with usable data

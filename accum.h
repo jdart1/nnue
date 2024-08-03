@@ -22,11 +22,7 @@ class Accumulator {
     virtual ~Accumulator() = default;
 
     static AccumulatorHalf getHalf(Color sideToMove, Color c) {
-        // TBD direct enum compare not working?
-        int c1 = (c == White) ? 0 : 1;
-        int c2 = (sideToMove == White) ? 0 : 1;
-        return c1 == c2 ? AccumulatorHalf::Lower : AccumulatorHalf::Upper;
-        //        return (c == White ? AccumulatorHalf::Lower : AccumulatorHalf::Upper);
+        return (c == sideToMove) ? AccumulatorHalf::Lower : AccumulatorHalf::Upper;
     }
 
     template <typename BiasType>

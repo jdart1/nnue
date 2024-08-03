@@ -20,18 +20,19 @@ public:
 
     using AccumulatorType = Accumulator<OutputType, outputSize>;
 
+    inline static Square relativeSquare(Color perspective, Square sq) {
+        return sq ^ (static_cast<int>(perspective) * 56);
+    }
+
     template <Color kside>
     inline static IndexType getIndex(Square kp /* kside King */, Piece p, Square sq) {
-        //Square orig = sq;
         assert(p != EmptyPiece);
         if (kp % 8 >= E_FILE) {
             // flip file
             sq ^= 7;
         }
-        if (kside == Black) {
-            sq ^= 56;
-            kp ^= 56;
-        }
+        sq = relativeSquare(kside, sq);
+        kp = relativeSquare(kside, kp);
         IndexType idx = static_cast<IndexType>(kingBucketsMap[kp] * 12 * 64 +
                                                pieceTypeMap[kside != colorOfPiece(p)][p] * 64 +
                                                sq);
@@ -120,6 +121,11 @@ public:
 
     const BiasType *getBiases() const noexcept {
         return _biases;
+    }
+
+    static inline bool needsRefresh(Color perspective, Square oldKing, Square newKing) {
+        return ((fileOf(oldKing) >= E_FILE) != (fileOf(newKing) >= E_FILE)) ||
+            kingBucketsMap[relativeSquare(perspective, oldKing)] != kingBucketsMap[relativeSquare(perspective, newKing)];
     }
 
 private:
