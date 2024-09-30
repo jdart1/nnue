@@ -6,22 +6,20 @@
 #include <cassert>
 #include <chrono>
 #include <cstdio>
-#include <initializer_list>
 #include <fstream>
+#include <initializer_list>
 #include <iostream>
 #include <random>
 #include <set>
-#include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
-#include "../interface/chessint.h"
 #include "../interface/chessint.h"
 
 // Unit tests for nnue code
 
-template<size_t ROWS, size_t COLS>
-static int test_linear() {
+template <size_t ROWS, size_t COLS> static int test_linear() {
     int errs = 0;
 
     using InputType = uint8_t;
@@ -35,20 +33,20 @@ static int test_linear() {
     static BiasType biases[COLS];
     static WeightType weights[COLS][ROUNDED_ROWS]; // indexed first by output
 
-    constexpr size_t bufSize = COLS*sizeof(BiasType) + (ROUNDED_ROWS * COLS)*sizeof(WeightType);
+    constexpr size_t bufSize = COLS * sizeof(BiasType) + (ROUNDED_ROWS * COLS) * sizeof(WeightType);
     auto buf = std::unique_ptr<std::byte[]>(new std::byte[bufSize]);
 
     std::byte *b = buf.get();
     BiasType *bb = reinterpret_cast<BiasType *>(b);
     for (size_t i = 0; i < COLS; i++) {
-        *bb++ = biases[i] = (i%15) + i - 10;
+        *bb++ = biases[i] = (i % 15) + i - 10;
     }
-    b += COLS*sizeof(BiasType);
-    WeightType *w = reinterpret_cast<WeightType*>(b);
+    b += COLS * sizeof(BiasType);
+    WeightType *w = reinterpret_cast<WeightType *>(b);
     // serialized in column order
     for (size_t i = 0; i < COLS; i++) {
         for (size_t j = 0; j < ROUNDED_ROWS; j++) {
-            *w++ = weights[i][j] = ((i+j) % 20) - 10;
+            *w++ = weights[i][j] = ((i + j) % 20) - 10;
         }
     }
 
@@ -63,11 +61,11 @@ static int test_linear() {
     std::ofstream outfile(tmp_name, std::ios::binary | std::ios::trunc);
     outfile.write(reinterpret_cast<char *>(buf.get()), bufSize);
     if (outfile.bad()) {
-      ++errs;
-      std::cerr << "error writing stream" << std::endl;
-      outfile.close();
-      std::remove(tmp_name.c_str());
-      return 1;
+        ++errs;
+        std::cerr << "error writing stream" << std::endl;
+        outfile.close();
+        std::remove(tmp_name.c_str());
+        return 1;
     }
     outfile.close();
 
@@ -89,7 +87,8 @@ static int test_linear() {
     int tmp = errs;
     for (size_t i = 0; i < COLS; i++) {
         errs += (layer.getBiases()[i] != biases[i]);
-	if (layer.getBiases()[i] != biases[i]) std::cerr << layer.getBiases()[i] << ' ' << biases[i] << std::endl;
+        if (layer.getBiases()[i] != biases[i])
+            std::cerr << layer.getBiases()[i] << ' ' << biases[i] << std::endl;
     }
     for (size_t i = 0; i < COLS; i++) {
         // get weights for output column
@@ -103,7 +102,7 @@ static int test_linear() {
 
     alignas(nnue::DEFAULT_ALIGN) InputType inputs[ROWS];
     for (unsigned i = 0; i < ROWS; i++) {
-        inputs[i] = std::min<int>(127,static_cast<InputType>(i+1));
+        inputs[i] = std::min<int>(127, static_cast<InputType>(i + 1));
     }
 
     alignas(nnue::DEFAULT_ALIGN) OutputType output[COLS], computed[COLS];
@@ -134,12 +133,13 @@ static const std::unordered_map<char, nnue::Piece> pieceMap = {
     {'P', nnue::WhitePawn}, {'N', nnue::WhiteKnight}, {'B', nnue::WhiteBishop},
     {'R', nnue::WhiteRook}, {'Q', nnue::WhiteQueen},  {'K', nnue::WhiteKing}};
 
-// wrapper around nnue::ArasanV3Feature, sets up that class with some fixed parameters
+// wrapper around nnue::ArasanV3Feature, sets up that class with some fixed
+// parameters
 class ArasanV3Feature {
   public:
     static constexpr size_t OutputSize = 1024;
 
-    static constexpr size_t InputSize = 22*OutputSize;
+    static constexpr size_t InputSize = 22 * OutputSize;
 
     using OutputType = int16_t;
 
@@ -152,9 +152,7 @@ class ArasanV3Feature {
 
     AccumulatorType accum;
 
-    void init(unsigned index, const OutputType vals[]) {
-        layer1.get()->setCol(index, vals);
-    }
+    void init(unsigned index, const OutputType vals[]) { layer1.get()->setCol(index, vals); }
 
     FeatureXformer *get() const noexcept { return layer1.get(); }
 
@@ -170,37 +168,32 @@ static int16_t zero_col[ArasanV3Feature::OutputSize] = {0};
 static int16_t biases[ArasanV3Feature::OutputSize];
 
 static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexType> &w_expected,
-                        std::unordered_set<nnue::IndexType> &b_expected) {
+                       std::unordered_set<nnue::IndexType> &b_expected) {
     Position p(fen);
     ChessInterface intf(&p);
 
     nnue::IndexArray wIndices, bIndices;
-    auto wCount = nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(
-        intf, wIndices);
-    auto bCount = nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(
-        intf, bIndices);
+    auto wCount = nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(intf, wIndices);
+    auto bCount = nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(intf, bIndices);
 
     int errs = 0;
     for (auto it = wIndices.begin(); it != wIndices.begin() + wCount; it++) {
         if (w_expected.find(*it) == w_expected.end()) {
             ++errs;
-            std::cerr << "error: white index " << *it << " not expected"
-                      << std::endl;
+            std::cerr << "error: white index " << *it << " not expected" << std::endl;
         } else
             w_expected.erase(*it);
     }
     for (auto it = bIndices.begin(); it != bIndices.begin() + bCount; it++) {
         if (b_expected.find(*it) == b_expected.end()) {
             ++errs;
-            std::cerr << "error: black index " << *it << " not expected"
-                      << std::endl;
+            std::cerr << "error: black index " << *it << " not expected" << std::endl;
         } else
             b_expected.erase(*it);
     }
     if (!w_expected.empty()) {
         ++errs;
-        std::cerr << "error: not all expected White indices found, missing "
-                  << std::endl;
+        std::cerr << "error: not all expected White indices found, missing " << std::endl;
         for (auto i : w_expected) {
             std::cerr << i << ' ';
         }
@@ -208,8 +201,7 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
     }
     if (!b_expected.empty()) {
         ++errs;
-        std::cerr << "error: not all expected Black indices found, missing "
-                  << std::endl;
+        std::cerr << "error: not all expected Black indices found, missing " << std::endl;
         for (auto i : b_expected) {
             std::cerr << i << ' ';
         }
@@ -220,7 +212,8 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
 
     ArasanV3Feature::AccumulatorType accum;
 
-    for (size_t i = 0; i < ArasanV3Feature::InputSize; ++i) feature.get()->setCol(i,zero_col);
+    for (size_t i = 0; i < ArasanV3Feature::InputSize; ++i)
+        feature.get()->setCol(i, zero_col);
 
     feature.get()->setCol(36, col1);
     feature.get()->setCol(686, col2);
@@ -237,22 +230,22 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
         expected[1][i] = col1[i] + col2[i] + biases[i];
     }
     static const nnue::AccumulatorHalf halves[2] = {nnue::AccumulatorHalf::Lower,
-        nnue::AccumulatorHalf::Upper};
+                                                    nnue::AccumulatorHalf::Upper};
     for (auto h : halves) {
         for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
             auto exp = expected[h == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
             if (exp != accum.getOutput(h)[i]) {
                 ++errs;
-                std::cerr << " error at accum index " << int(i)
-                          << " expected: " << int(exp) << " actual "
-                          << accum.getOutput(h)[i] << std::endl;
+                std::cerr << " error at accum index " << int(i) << " expected: " << int(exp)
+                          << " actual " << accum.getOutput(h)[i] << std::endl;
             }
         }
     }
 
     // Test output layer
     nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
-                            ArasanV3Feature::OutputSize * 2, 255> outputLayer;
+                            ArasanV3Feature::OutputSize * 2, 255, true>
+        outputLayer;
 
     int32_t out, out2;
     outputLayer.postProcessAccum(accum, &out);
@@ -264,10 +257,8 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
             int16_t x = accum.getOutput(h)[i];
             // CReLU
             x = std::clamp<int16_t>(x, 0, nnue::NETWORK_QA);
-            // compute square (will not overflow)
-            int16_t x2 = (x * x);
-            // square and sum
-            sum += (outputLayer.getCol(0)[i + offset] * x2);
+            // multiply with saturation then square
+            sum += ((outputLayer.getCol(0)[i + offset] * x) & 0xffff) * x;
         }
         offset += accum.getSize();
     }
@@ -281,18 +272,17 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
     return errs;
 }
 
-
-template<nnue::Color c>
-static void getIndices(const ChessInterface &ci,
-                       std::set<nnue::IndexType> &indices) {
+template <nnue::Color c>
+static void getIndices(const ChessInterface &ci, std::set<nnue::IndexType> &indices) {
     nnue::IndexArray a;
-    nnue::Evaluator<ChessInterface>::getIndices<c>(ci,a);
+    nnue::Evaluator<ChessInterface>::getIndices<c>(ci, a);
     for (auto it = a.begin(); it != a.end() && *it != nnue::LAST_INDEX; it++) {
         indices.insert(*it);
     }
 }
 
-static int test_incr(const nnue::Network &network, int casenum, ChessInterface &ciSource, ChessInterface &ciTarget) {
+static int test_incr(const nnue::Network &network, int casenum, ChessInterface &ciSource,
+                     ChessInterface &ciTarget) {
     int errs = 0;
     assert(ciSource != ciTarget);
 
@@ -301,8 +291,8 @@ static int test_incr(const nnue::Network &network, int casenum, ChessInterface &
     // do full calculation for target
     nnue::Network::AccumulatorType fullEvalAccum;
     nnue::IndexArray wIndices, bIndices;
-    nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(ciTarget,wIndices);
-    nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(ciTarget,bIndices);
+    nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(ciTarget, wIndices);
+    nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(ciTarget, bIndices);
     nnue::Evaluator<ChessInterface>::updateAccum(network, ciTarget, fullEvalAccum);
 
     // do incremental update if possible
@@ -313,7 +303,8 @@ static int test_incr(const nnue::Network &network, int casenum, ChessInterface &
     int tmp = errs;
     errs += ciTarget.getAccumulator() != fullEvalAccum;
     if (errs - tmp) {
-        std::cout << "test_incr: error in case " << casenum << " standard/incremental update differs" << std::endl;
+        std::cout << "test_incr: error in case " << casenum
+                  << " standard/incremental update differs" << std::endl;
     }
 
     return errs;
@@ -323,9 +314,8 @@ static int test_incremental() {
 
     struct ChangeRecord {
         // fen is position after the change described in the DirtyState(s)
-        ChangeRecord(const std::string &f, const std::vector<DirtyState> &c) :
-            fen(f) {
-            std::copy(c.begin(),c.end(),std::back_inserter(changes));
+        ChangeRecord(const std::string &f, const std::vector<DirtyState> &c) : fen(f) {
+            std::copy(c.begin(), c.end(), std::back_inserter(changes));
         }
         std::string fen;
         std::vector<DirtyState> changes;
@@ -360,11 +350,15 @@ static int test_incremental() {
     };
 
     const std::array<Case, 5> cases = {
-        Case{ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B1K2R b KQkq -", {}),
+        Case{ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/"
+                          "R1B1K2R b KQkq -",
+                          {}),
              ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/8/2pP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQkq -",
                           {DirtyState(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn),
                            DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::WhitePawn)})},
-        Case{ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B1K2R b KQkq -", {}),
+        Case{ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/3p4/2PP4/2N1PN2/PPQ1BPPP/"
+                          "R1B1K2R b KQkq -",
+                          {}),
              ChangeRecord("r1bqk2r/pp1n1ppp/2pbpn2/8/2pP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQkq -",
                           {DirtyState(35 /*D5*/, 26 /*C4*/, nnue::BlackPawn),
                            DirtyState(26 /*C4*/, nnue::InvalidSquare, nnue::WhitePawn)}),
@@ -380,7 +374,7 @@ static int test_incremental() {
                           {DirtyState(21 /*F3*/, 11 /*D2*/, nnue::BlackKnight)}),
              ChangeRecord("8/6k1/7p/3N1P2/8/2P1K3/3n4/8 b - -",
                           {DirtyState(21 /*E4*/, 11 /*E3*/, nnue::WhiteKing)})},
-        Case{ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P1Q5/8/5nPP/1q4K1 w - -",{}),
+        Case{ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P1Q5/8/5nPP/1q4K1 w - -", {}),
              ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P7/8/5nPP/1q3QK1 b - -",
                           {DirtyState(26 /*C4*/, 5 /*F1*/, nnue::WhiteQueen)}),
              ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P7/8/5nPP/5qK1 w - -",
@@ -389,8 +383,8 @@ static int test_incremental() {
              ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P7/8/5nPP/5qK1 w - -",
                           {DirtyState(26 /*C4*/, 5 /*F1*/, nnue::WhiteQueen)}),
              ChangeRecord("5r1k/3Q2pp/p7/4p1B1/P7/8/5nPP/5qK1 w - -",
-                          {DirtyState(6 /*G1*/, 5 /*F1*/,nnue::BlackKing)})},
-        Case{ChangeRecord("2Q2r1k/3n2p1/p6p/4p1B1/P1Q5/2N5/2q2nPP/R5K1 w - -",{}),
+                          {DirtyState(6 /*G1*/, 5 /*F1*/, nnue::BlackKing)})},
+        Case{ChangeRecord("2Q2r1k/3n2p1/p6p/4p1B1/P1Q5/2N5/2q2nPP/R5K1 w - -", {}),
              ChangeRecord("5Q1k/3n2p1/p6p/4p1B1/P1Q5/2N5/2q2nPP/R5K1 b - -",
                           {DirtyState(58 /*C8*/, 60 /*F8*/, nnue::WhiteQueen),
                            DirtyState(60 /*F8*/, nnue::InvalidSquare, nnue::BlackRook)}),
@@ -412,7 +406,7 @@ static int test_incremental() {
 
     int i = 0;
     for (const auto &c : cases) {
-        Position *source_pos  = c.pos_list.front();
+        Position *source_pos = c.pos_list.front();
         ChessInterface ciSource(source_pos);
         Position *target_pos = c.pos_list.back();
         ChessInterface ciTarget(target_pos);
@@ -438,15 +432,16 @@ static int test_CReLU() {
 
     for (unsigned i = 0; i < size; i++) {
         input[i] = -9000 + 900*std::min<unsigned>(i,10) + i;
-        output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i] >> RSHIFT,0,CLAMP_MAX));
+        output[i] = static_cast<OutputType>(std::clamp<InputType>(input[i] >>
+RSHIFT,0,CLAMP_MAX));
     }
     std::memset(output2,'\0',size*sizeof(OutputType));
     c.doForward(input,output2);
     for (unsigned i = 0; i < size; i++) {
         errs += output2[i] != output[i];
     }
-    if (errs) std::cerr << errs << " error(s) in scale and clamp function" << std::endl;
-    return errs;
+    if (errs) std::cerr << errs << " error(s) in scale and clamp function" <<
+std::endl; return errs;
 }
 */
 
@@ -454,26 +449,31 @@ int main(int argc, char **argv) {
     nnue::Network n;
 
     int errs = 0;
-    errs += test_linear<1024,16>();
-    errs += test_linear<32,32>();
-    errs += test_linear<16,16>();
-    errs += test_linear<32,1>();
+    errs += test_linear<1024, 16>();
+    errs += test_linear<32, 32>();
+    errs += test_linear<16, 16>();
+    errs += test_linear<32, 1>();
     errs += test_incremental();
-    std::unordered_set<nnue::IndexType> w_expected{199, 195, 321, 10,  137, 17,  30,
-                                                   413, 24,  422, 36,  483, 288, 686,
-                                                   620, 426, 424, 434, 753, 635};
-    std::unordered_set<nnue::IndexType> b_expected{2175, 2171, 2297, 1970, 2097, 1961, 1958,
-                                                   1573, 1952, 1566, 1948, 1627, 2200, 1814,
-                                                   1748, 1554, 1552, 1546, 1865, 1731};
+    std::unordered_set<nnue::IndexType> w_expected{967,  963,  1089, 778,  905,  785,  798,
+                                                   1181, 792,  1190, 804,  1251, 1056, 1454,
+                                                   1388, 1194, 1192, 1202, 1521, 1403};
+
+    std::unordered_set<nnue::IndexType> b_expected{4479, 4475, 4601, 4274, 4401, 4265, 4262,
+                                                   3877, 4256, 3870, 4252, 3931, 4504, 4118,
+                                                   4052, 3858, 3856, 3850, 4169, 4035};
+
     errs += testFeature("4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -", w_expected,
-                         b_expected);
-    std::unordered_set<nnue::IndexType> w_expected2{199, 194, 321, 269, 11,  10,  137, 8,   22,
-                                                    82,  17,  154, 422, 421, 548, 686, 427, 424,
-                                                    439, 500, 434, 433, 639, 763, 570, 632};
+                        b_expected);
+    std::unordered_set<nnue::IndexType> w_expected2{
+        967,  962,  1089, 1037, 779,  778,  905,  776,  790,  850,  785,  922,  1190,
+        1189, 1316, 1454, 1195, 1192, 1207, 1268, 1202, 1201, 1407, 1531, 1338, 1400};
+
     std::unordered_set<nnue::IndexType> b_expected2{
-        1407, 1402, 1529, 1461, 1203, 1202, 1329, 1200, 1198, 1258, 1193, 1314, 798,
-        797,  924,  1046, 787,  784,  783,  844,  778,  777,  967,  1091, 898,  960};
-    errs += testFeature("r3kb1r/p2n1pp1/1q2p2p/1ppb4/5B2/1P3NP1/2Q1PPBP/R4RK1 w kq -", w_expected2, b_expected2);
+        2943, 2938, 3065, 2997, 2739, 2738, 2865, 2736, 2734, 2794, 2729, 2850, 2334,
+        2333, 2460, 2582, 2323, 2320, 2319, 2380, 2314, 2313, 2503, 2627, 2434, 2496};
+
+    errs += testFeature("r3kb1r/p2n1pp1/1q2p2p/1ppb4/5B2/1P3NP1/2Q1PPBP/R4RK1 w kq -", w_expected2,
+                        b_expected2);
 
     //    errs += test_CReLU<16>();
     //    errs += test_CReLU<32>();
@@ -504,14 +504,15 @@ int main(int argc, char **argv) {
         std::ifstream in(fname);
         in >> n;
         if (in.bad()) {
-            std::cerr << "error loading " << fname << std::endl << ":" << strerror(errno) << std::flush;
-        }
-        else {
-            if (fen.empty()) fen = "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
+            std::cerr << "error loading " << fname << std::endl
+                      << ":" << strerror(errno) << std::flush;
+        } else {
+            if (fen.empty())
+                fen = "4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -";
             Position p(fen);
             ChessInterface intf(&p);
             std::cout << "evaluating: " << fen << std::endl;
-            int val = nnue::Evaluator<ChessInterface>::fullEvaluate(n,intf);
+            int val = nnue::Evaluator<ChessInterface>::fullEvaluate(n, intf);
             std::cout << "value=" << val << std::endl;
         }
     }
