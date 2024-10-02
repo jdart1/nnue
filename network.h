@@ -107,6 +107,7 @@ class Network {
 };
 
 inline std::istream &operator>>(std::istream &s, Network &network) {
+#ifdef STOCKFISH_FORMAT
     std::uint32_t version, size;
     version = read_little_endian<uint32_t>(s);
     // TBD: validate hash
@@ -128,6 +129,7 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
         str << c;
     }
     network.architecture = str.str();
+#endif
     // read feature layer
     (void)network.transformer->read(s);
     // read num buckets x layers
