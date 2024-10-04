@@ -144,6 +144,7 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
     }
     if (n != OutputBuckets) {
         s.setstate(std::ios::failbit);
+    }
 
     return s;
 }
