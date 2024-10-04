@@ -89,8 +89,8 @@ public:
 
     // read weights from a stream
     virtual std::istream &read(std::istream &s) {
-        // read hash
 #ifdef STOCKFISH_FORMAT
+        // read hash
         (void)read_little_endian<uint32_t>(s);
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
