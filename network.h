@@ -136,7 +136,7 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
     unsigned n = 0;
     for (size_t i = 0; i < OutputBuckets && s.good(); ++i) {
         // skip next 4 bytes (hash)
-#ifndef STOCKFISH_FORMAT
+#ifdef STOCKFISH_FORMAT
         (void)read_little_endian<uint32_t>(s);
 #endif
         network.outputLayer[i]->read(s);
