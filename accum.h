@@ -93,6 +93,16 @@ class Accumulator {
 
     size_t getSize() const noexcept { return size; }
 
+    void print(AccumulatorHalf half, std::ostream &out) const noexcept {
+        int p = halfToIndex(half);
+        out << "perspective " << p << std::endl;
+        for (unsigned i = 0; i < size; ++i) {
+            out << static_cast<int>(_accum[p][i]) << ' ';
+            if ((i + 1) % 64 == 0)
+                out << std::endl;
+        }
+    }
+
 #ifdef NNUE_TRACE
     template <typename _OutputType, size_t _size,
               size_t _alignment>
@@ -129,11 +139,7 @@ inline std::ostream &operator<<(std::ostream &o,
                                 const Accumulator<OutputType, size, alignment> &accum) {
     for (unsigned p = 0; p < 2; ++p) {
         std::cout << "perspective " << p << std::endl;
-        for (unsigned i = 0; i < size; ++i) {
-            std::cout << static_cast<int>(accum._accum[p][i]) << ' ';
-            if ((i + 1) % 64 == 0)
-                std::cout << std::endl;
-        }
+        accum.print(p == 0 ? AccumulatorHalf::Lower : AccumulatorHalf::Upper,std::cout);
     }
     return o;
 }

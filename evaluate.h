@@ -76,7 +76,7 @@ public:
                                            AccumulatorState::Computed);
 #ifdef NNUE_TRACE
         std::cout << "incremental evaluate" << std::endl;
-        std::cout << ciTarget.getAccumulator(targetHalf) << std::endl;
+        ciTarget.getAccumulator().print(targetHalf,std::cout);
 #endif
     }
 
