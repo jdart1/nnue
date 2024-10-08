@@ -34,7 +34,7 @@ class SqrCReLUAndLinear
             sum += *output;
             simd::sqrCRelUAndLinear < InputType, OutputType, WeightType, inputSize / 2, 1, saturate >
                                       (accum.getOutput(AccumulatorHalf::Upper), output, clampMax,
-                                       this->_weights[0] + inputSize / 2);
+                                       this->_weights[0] + (inputSize / 2));
             sum += *output;
             output[0] = (sum / NETWORK_QA) + this->_biases[0];
         } else

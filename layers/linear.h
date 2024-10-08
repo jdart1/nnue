@@ -89,6 +89,23 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
         return s;
     }
 
+    virtual std::istream &readWeights(std::istream &s) {
+        for (size_t i = 0; i < inputSize && s.good(); ++i) {
+            for (size_t j = 0; j < outputSize && s.good(); ++j) {
+                // flip rows and columns for easier computation
+                _weights[j][i] = read_little_endian<WeightType>(s);
+            }
+        }
+        return s;
+    }
+
+    virtual std::istream &readBiases(std::istream &s) {
+        for (size_t i = 0; i < outputSize && s.good(); ++i) {
+            _biases[i] = read_little_endian<BiasType>(s);
+        }
+        return s;
+    }
+
     virtual const BiasType *getBiases() const noexcept { return _biases; }
 
     virtual const WeightType *getCol(size_t col) const noexcept { return _weights[col]; }

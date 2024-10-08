@@ -133,19 +133,29 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
     // read feature layer
     (void)network.transformer->read(s);
     // read num buckets x layers
-    unsigned n = 0;
+    unsigned n = 0, expected = 0;
+#ifdef STOCKFISH_FORMAT
     for (size_t i = 0; i < OutputBuckets && s.good(); ++i) {
         // skip next 4 bytes (hash)
-#ifdef STOCKFISH_FORMAT
         (void)read_little_endian<uint32_t>(s);
-#endif
         network.outputLayer[i]->read(s);
         ++n;
     }
-    if (n != OutputBuckets) {
+    expected = OutputBuckets;
+#else
+    for (size_t i = 0; i < OutputBuckets && s.good(); ++i) {
+        network.outputLayer[i]->readWeights(s);
+        ++n;
+    }
+    for (size_t i = 0; i < OutputBuckets && s.good(); ++i) {
+        network.outputLayer[i]->readBiases(s);
+        ++n;
+    }
+    expected = 2*OutputBuckets;
+#endif
+    if (n != expected) {
         s.setstate(std::ios::failbit);
     }
-
     return s;
 }
 
