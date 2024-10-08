@@ -10,7 +10,7 @@ static constexpr size_t DEFAULT_ALIGN = 32;
 
 static constexpr size_t MAX_INDICES = 34; // 16 pieces per side plus room for end of list marker
 
-static constexpr unsigned KingBuckets = 13;
+static constexpr unsigned KingBuckets = 7;
 
 static constexpr unsigned OutputBuckets = 8;
 
@@ -22,7 +22,7 @@ static constexpr IndexType LAST_INDEX = 1000000;
 
 // input quantization, i.e. 0..1 in float domain is
 // 0 .. NETWORK_QA in integer domain.
-static constexpr int NETWORK_QA = 255;
+static constexpr int NETWORK_QA = 510;
 // weight quantization, i.e. resolution of the weights. Weight of 1 in
 // integer domain has NETWORK_QB levels
 static constexpr int NETWORK_QB = 64;
