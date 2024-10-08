@@ -137,10 +137,8 @@ template <typename OutputType, size_t size,
           size_t alignment = DEFAULT_ALIGN>
 inline std::ostream &operator<<(std::ostream &o,
                                 const Accumulator<OutputType, size, alignment> &accum) {
-    for (unsigned p = 0; p < 2; ++p) {
-        std::cout << "perspective " << p << std::endl;
-        accum.print(p == 0 ? AccumulatorHalf::Lower : AccumulatorHalf::Upper,std::cout);
-    }
+    accum.print(AccumulatorHalf::Lower,o);
+    accum.print(AccumulatorHalf::Upper,o);
     return o;
 }
 #endif
