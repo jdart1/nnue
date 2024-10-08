@@ -13,7 +13,7 @@ class Network {
     template <typename ChessInterface> friend class Evaluator;
 
   public:
-    static constexpr size_t FeatureXformerOutputSize = 1024;
+    static constexpr size_t FeatureXformerOutputSize = 2048;
 
     static constexpr size_t FeatureXformerRows = 12 * KingBuckets * 64;
 
