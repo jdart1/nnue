@@ -3,11 +3,12 @@
 #define _ARASANV3_H
 
 #include "nndefs.h"
+#include "nnparams.h"
 #include "accum.h"
 #include "util.h"
 
 // Implements the feature transformer for the "Arasan v3" neural network architecture.
-// This feature uses 5 king buckets. King position is mirrored so that the King is always on files e..h.
+// King position is mirrored so that the King is always on files e..h.
 template <typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
           size_t outputSize, size_t alignment = DEFAULT_ALIGN>
 class ArasanV3Feature
@@ -33,7 +34,7 @@ public:
         }
         sq = relativeSquare(kside, sq);
         kp = relativeSquare(kside, kp);
-        IndexType idx = static_cast<IndexType>(kingBucketsMap[kp] * 12 * 64 +
+        IndexType idx = static_cast<IndexType>(NetworkParams::KING_BUCKETS_MAP[kp] * 12 * 64 +
                                                pieceTypeMap[kside != colorOfPiece(p)][p] * 64 +
                                                sq);
         assert(idx < inputSize);
@@ -151,26 +152,14 @@ public:
 
     static inline bool needsRefresh(Color perspective, Square oldKing, Square newKing) {
         return ((fileOf(oldKing) >= E_FILE) != (fileOf(newKing) >= E_FILE)) ||
-            kingBucketsMap[relativeSquare(perspective, oldKing)] != kingBucketsMap[relativeSquare(perspective, newKing)];
+            NetworkParams::KING_BUCKETS_MAP[relativeSquare(perspective, oldKing)] !=
+            NetworkParams::KING_BUCKETS_MAP[relativeSquare(perspective, newKing)];
     }
 
 private:
     static constexpr unsigned pieceTypeMap[2][16] = {
                                                      {0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 0},
                                                      {0, 6, 7, 8, 9, 10, 11, 0, 0, 6, 7, 8, 9, 10, 11, 0}};
-
-    // as in Obsidian
-    // clang-format off
-    static constexpr unsigned kingBucketsMap[] = {
-        0,  1,  2,  3,  3,  2,  1,  0,
-        4,  5,  6,  7,  7,  6,  5,  4,
-        8,  8,  9,  9,  9,  9,  8,  8,
-        10, 10, 10, 10, 10, 10, 10, 10,
-        11, 11, 11, 11, 11, 11, 11, 11,
-        11, 11, 11, 11, 11, 11, 11, 11,
-        12, 12, 12, 12, 12, 12, 12, 12,
-        12, 12, 12, 12, 12, 12, 12, 12};
-    // clang-format on
 
     alignas(alignment) BiasType _biases[outputSize];
     alignas(alignment) WeightType _weights[inputSize][outputSize];

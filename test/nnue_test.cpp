@@ -244,7 +244,7 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
 
     // Test output layer
     nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
-                            ArasanV3Feature::OutputSize * 2, 255, true>
+                            ArasanV3Feature::OutputSize * 2, 255, 255, true>
         outputLayer;
 
     int32_t out, out2;
@@ -256,13 +256,13 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
         for (size_t i = 0; i < accum.getSize(); ++i) {
             int16_t x = accum.getOutput(h)[i];
             // CReLU
-            x = std::clamp<int16_t>(x, 0, nnue::NETWORK_QA);
+            x = std::clamp<int16_t>(x, 0, 255);
             // multiply with saturation then square
             sum += ((outputLayer.getCol(0)[i + offset] * x) & 0xffff) * x;
         }
         offset += accum.getSize();
     }
-    out2 = (sum / nnue::NETWORK_QA) + *(feature.get()->getBiases());
+    out2 = (sum / 255) + *(feature.get()->getBiases());
     if (out != out2) {
         std::cerr << "error in output layer" << std::endl;
         std::cerr << out << ' ' << out2 << std::endl;

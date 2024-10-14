@@ -110,7 +110,9 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
     }
 
     virtual std::istream &readBiases(std::istream &s) {
+#ifdef NNUE_TRACE
         int min_bias = 1<<30, max_bias = -(1<<30);
+#endif
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
 #ifdef NNUE_TRACE

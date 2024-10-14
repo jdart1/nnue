@@ -10,29 +10,13 @@ static constexpr size_t DEFAULT_ALIGN = 32;
 
 static constexpr size_t MAX_INDICES = 34; // 16 pieces per side plus room for end of list marker
 
-static constexpr unsigned KingBuckets = 13;
-
-static constexpr unsigned OutputBuckets = 8;
-
 using IndexType = unsigned;
 
 static constexpr IndexType LAST_INDEX = 1000000;
 
 // Quantization factors
 
-// input quantization, i.e. 0..1 in float domain is
-// 0 .. NETWORK_QA in integer domain.
-static constexpr int NETWORK_QA = 255;
-// weight quantization, i.e. resolution of the weights. Weight of 1 in
-// integer domain has NETWORK_QB levels
-static constexpr int NETWORK_QB = 64;
-// network output value is multiplied by this to obtain position score
-static constexpr int OUTPUT_SCALE = 400;
-
 using IndexArray = std::array<IndexType,MAX_INDICES>;
-
-// version of the network
-static constexpr uint32_t NN_VERSION = 0x68AE02B9u;
 
 #endif
 

@@ -11,7 +11,7 @@
 // If saturate = false, the input is just squared, asssuming no saturation. This will be true if the inputs are
 // clamped to <=181 = square root of 32768.
 template <typename AccumulatorType, typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
-          unsigned clampMax, bool saturate, size_t alignment = DEFAULT_ALIGN>
+          unsigned clampMax, size_t NETWORK_QA, bool saturate, size_t alignment = DEFAULT_ALIGN>
 class SqrCReLUAndLinear
     : public LinearLayer<InputType, WeightType, BiasType, OutputType, inputSize, 1, alignment> {
   public:
