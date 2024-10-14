@@ -90,19 +90,37 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
     }
 
     virtual std::istream &readWeights(std::istream &s) {
+#ifdef NNUE_TRACE
+        int min_weight = 1<<30, max_weight = -(1<<30);
+#endif
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
             for (size_t j = 0; j < outputSize && s.good(); ++j) {
                 // flip rows and columns for easier computation
                 _weights[j][i] = read_little_endian<WeightType>(s);
+#ifdef NNUE_TRACE
+                if (_weights[j][i] < min_weight) min_weight = _weights[j][i];
+                if (_weights[j][i] > max_weight) max_weight = _weights[j][i];
+#endif
             }
         }
+#ifdef NNUE_TRACE
+        std::cout << "min output weight = " << min_weight << " max output weight = " << max_weight << std::endl;
+#endif
         return s;
     }
 
     virtual std::istream &readBiases(std::istream &s) {
+        int min_bias = 1<<30, max_bias = -(1<<30);
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
+#ifdef NNUE_TRACE
+            if (_biases[i] < min_bias) min_bias = _biases[i];
+            if (_biases[i] > max_bias) max_bias = _biases[i];
+#endif
         }
+#ifdef NNUE_TRACE
+        std::cout << "min output bias = " << min_bias << " max output bias = " << max_bias << std::endl;
+#endif
         return s;
     }
 

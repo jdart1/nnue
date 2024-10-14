@@ -89,6 +89,9 @@ public:
 
     // read weights from a stream
     virtual std::istream &read(std::istream &s) {
+#ifdef NNUE_TRACE
+       int min_weight = 1<<30, max_weight = -(1<<30), min_bias = 1<<30, max_bias = -(1<<30);
+#endif
 #ifdef STOCKFISH_FORMAT
         // read hash
         (void)read_little_endian<uint32_t>(s);
@@ -104,14 +107,26 @@ public:
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
             for (size_t j = 0; j < outputSize && s.good(); ++j) {
                 _weights[i][j] = read_little_endian<WeightType>(s);
+#ifdef NNUE_TRACE
+                if (_weights[i][j] < min_weight) min_weight = _weights[i][j];
+                if (_weights[i][j] > max_weight) max_weight = _weights[i][j];
+#endif
             }
         }
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             _biases[i] = read_little_endian<BiasType>(s);
+#ifdef NNUE_TRACE
+            if (_biases[i] < min_bias) min_bias = _biases[i];
+            if (_biases[i] > max_bias) max_bias = _biases[i];
+#endif
         }
 #endif
 #ifdef _DEBUG
         if (!s.good()) std::cout << strerror(errno) << std::endl;
+#endif
+#ifdef NNUE_TRACE
+        std::cout << "min feature weight = " << min_weight << " max feature weight = " << max_bias << std::endl;
+        std::cout << "min feature bias = " << min_bias << " max feature bias = " << max_bias << std::endl;
 #endif
         return s;
     }
