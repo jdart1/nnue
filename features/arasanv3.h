@@ -126,8 +126,10 @@ public:
         if (!s.good()) std::cout << strerror(errno) << std::endl;
 #endif
 #ifdef NNUE_TRACE
-        std::cout << "min feature weight = " << min_weight << " max feature weight = " << max_bias << std::endl;
-        std::cout << "min feature bias = " << min_bias << " max feature bias = " << max_bias << std::endl;
+        if (!s.fail()) {
+            std::cout << "min feature weight = " << min_weight << " max feature weight = " << max_weight << std::endl;
+            std::cout << "min feature bias = " << min_bias << " max feature bias = " << max_bias << std::endl;
+        }
 #endif
         return s;
     }
