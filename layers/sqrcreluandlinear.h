@@ -26,7 +26,7 @@ class SqrCReLUAndLinear
 
     void postProcessAccum(const AccumulatorType &accum, OutputType *output) const {
         int32_t sum = 0;
-#if defined(SIMD)
+#ifdef SIMD
         if constexpr (sizeof(InputType) == 2) {
             simd::sqrCRelUAndLinear < InputType, OutputType, WeightType, inputSize / 2, 1, saturate >
                                       (accum.getOutput(AccumulatorHalf::Lower), output, clampMax,
@@ -62,7 +62,7 @@ class SqrCReLUAndLinear
                     // CReLU
                     x = std::clamp<int16_t>(x, 0, clampMax);
                     if constexpr (saturate) {
-                        sum += ((this->_weights[0][i + offset] * x) & 0xffff) * x;
+                        sum += std::clamp<int32_t>(this->_weights[0][i + offset] * x,-32767,32768) * x;
                     }
                     else {
                         // square and sum
