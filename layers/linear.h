@@ -84,8 +84,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
         int min_weights[buckets] = {1 << 30};
         int max_weights[buckets] = {-(1 << 30)};
         int min_biases[buckets] = {1 << 30};
-        int max_biases[buckets] =
-        { -(1 << 30) }
+        int max_biases[buckets] = { -(1 << 30) };
 #endif
         // bullet format. Weights are in a matrix ordered with 1st
         // dimension weights, 2nd dimension buckets. We want 1st
@@ -123,7 +122,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
         if (!s.fail()) {
             std::cout << "linear layer stats by bucket" << std::endl;
             for (size_t b = 0; b < buckets; ++b) {
-                std::cout << b << ": " << std::cout << "min weight = " << min_weights[b]
+                std::cout << b << ": " << "min weight = " << min_weights[b]
                           << " max weight = " << max_weights[b] << " min bias = " << min_biases[b]
                           << " max bias = " << max_biases[b] << std::endl;
             }
