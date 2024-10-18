@@ -27,6 +27,8 @@ template <size_t ROWS, size_t COLS> static int test_linear() {
     using BiasType = int32_t;
     using OutputType = int32_t;
 
+    // note: assumes 1 output bucket
+
     // serializer assumes rows are at least 32 bytes
     static constexpr size_t ROUNDED_ROWS = std::max<size_t>(ROWS, 32);
 
@@ -50,7 +52,7 @@ template <size_t ROWS, size_t COLS> static int test_linear() {
         }
     }
 
-    nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS> layer;
+    nnue::LinearLayer<InputType, WeightType, BiasType, OutputType, ROWS, COLS, 1> layer;
 
 #if defined(__MINGW32__) || defined(__MINGW64__) || (defined(__APPLE__) && defined(__MACH__))
     std::string tmp_name("XXXXXX");
@@ -86,13 +88,13 @@ template <size_t ROWS, size_t COLS> static int test_linear() {
     // verify layer was read
     int tmp = errs;
     for (size_t i = 0; i < COLS; i++) {
-        errs += (layer.getBiases()[i] != biases[i]);
-        if (layer.getBiases()[i] != biases[i])
-            std::cerr << layer.getBiases()[i] << ' ' << biases[i] << std::endl;
+        errs += (layer.getBiases(0)[i] != biases[i]);
+        if (layer.getBiases(0)[i] != biases[i])
+            std::cerr << layer.getBiases(0)[i] << ' ' << biases[i] << std::endl;
     }
     for (size_t i = 0; i < COLS; i++) {
         // get weights for output column
-        const WeightType *col = layer.getCol(i);
+        const WeightType *col = layer.getCol(0,i);
         for (size_t j = 0; j < ROWS; j++) {
             errs += (weights[i][j] != col[j]);
         }
@@ -107,7 +109,7 @@ template <size_t ROWS, size_t COLS> static int test_linear() {
 
     alignas(nnue::DEFAULT_ALIGN) OutputType output[COLS], computed[COLS];
     // test linear layer propagation
-    layer.forward(inputs, output);
+    layer.forward(0, inputs, output);
     for (size_t i = 0; i < COLS; i++) {
         computed[i] = static_cast<OutputType>(biases[i]);
     }
@@ -244,11 +246,11 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
 
     // Test output layer
     nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
-                            ArasanV3Feature::OutputSize * 2, 255, 255, true>
+                            ArasanV3Feature::OutputSize * 2, 255, 255, 1, true>
         outputLayer;
 
     int32_t out, out2;
-    outputLayer.postProcessAccum(accum, &out);
+    outputLayer.postProcessAccum(accum, 0, &out);
     // compare output with generic implementation
     size_t offset = 0;
     int32_t sum = 0;
@@ -258,7 +260,7 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
             // CReLU
             x = std::clamp<int16_t>(x, 0, 255);
             // multiply with saturation then square
-            sum += ((outputLayer.getCol(0)[i + offset] * x) & 0xffff) * x;
+            sum += ((outputLayer.getCol(0,0)[i + offset] * x) & 0xffff) * x;
         }
         offset += accum.getSize();
     }

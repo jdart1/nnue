@@ -2,7 +2,7 @@
 # Copyright 2020-2023 by Jon Dart. All Rights Reserved.
 #
 # typical build flags for different architectures, select one
-ARCH_FLAGS := -DSIMD -DSSE2 -DAVX2 -DUSE_POPCNT -DSSSE3 -DSSE41 -mavx2 -mbmi2 -msse4.1 -msse4.2 -mpopcnt -DSTOCKFISH_FORMAT
+ARCH_FLAGS := -DSIMD -DSSE2 -DAVX2 -DUSE_POPCNT -DSSSE3 -DSSE41 -mavx2 -mbmi2 -msse4.1 -msse4.2 -mpopcnt
 #ARCH_FLAGS = -mavx2 -mbmi2 -msse2 -DSIMD -DAVX2 -DAVX512 -mavx512bw
 #ARCH_FLAGS = -DSIMD -DNEON -mcpu=apple-m1 -m64
 #ARCH_FLAGS = -DSIMD -DNEON  -m64 -mmacosx-version-min=10.14 -arch arm64 -march=armv8.2-a+dotprod 

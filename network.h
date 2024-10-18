@@ -25,21 +25,17 @@ class Network {
     using AccumulatorOutputType = int16_t;
     using OutputLayer = SqrCReLUAndLinear<AccumulatorType, int16_t, int16_t, int16_t, OutputType,
                                           NetworkParams::HIDDEN_WIDTH * 2, NetworkParams::NETWORK_QA,
-                                          NetworkParams::NETWORK_QA, true>;
+                                          NetworkParams::NETWORK_QA, NetworkParams::OUTPUT_BUCKETS, true>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
     Network() : transformer(new FeatureXformer()) {
-        for (size_t i = 0; i < NetworkParams::OUTPUT_BUCKETS; ++i) {
-            outputLayer[i] = new OutputLayer();
-        }
+        outputLayer = new OutputLayer();
     }
 
     virtual ~Network() {
         delete transformer;
-        for (size_t i = 0; i < NetworkParams::OUTPUT_BUCKETS; ++i) {
-            delete outputLayer[i];
-        }
+        delete outputLayer;
     }
 
     template <Color kside> inline static unsigned getIndex(Square kp, Piece p, Square sq) {
@@ -62,7 +58,7 @@ class Network {
         std::cout << accum << std::endl;
 #endif
         // evaluate the output layer, in the correct bucket
-        outputLayer[bucket]->postProcessAccum(accum, reinterpret_cast<OutputType *>(buffer));
+        outputLayer->postProcessAccum(accum, bucket, reinterpret_cast<OutputType *>(buffer));
         int32_t nnOut = reinterpret_cast<int32_t *>(buffer)[0];
 #ifdef NNUE_TRACE
         std::cout << "NN output, after scaling: "
@@ -103,7 +99,7 @@ class Network {
 
   protected:
     FeatureXformer *transformer;
-    OutputLayer *outputLayer[NetworkParams::OUTPUT_BUCKETS];
+    OutputLayer *outputLayer;
     std::string architecture;
     uint32_t version;
 };
@@ -132,11 +128,10 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
     }
     network.architecture = str.str();
 #endif
-    // read feature layer
-    (void)network.transformer->read(s);
+#ifdef STOCKFISH_FORMAT
+    // TBD: remove
     // read num buckets x layers
     unsigned n = 0, expected = 0;
-#ifdef STOCKFISH_FORMAT
     for (size_t i = 0; i < NetworkParams::OUTPUT_BUCKETS && s.good(); ++i) {
         // skip next 4 bytes (hash)
         (void)read_little_endian<uint32_t>(s);
@@ -144,20 +139,15 @@ inline std::istream &operator>>(std::istream &s, Network &network) {
         ++n;
     }
     expected = NetworkParams::OUTPUT_BUCKETS;
-#else
-    for (size_t i = 0; i < NetworkParams::OUTPUT_BUCKETS && s.good(); ++i) {
-        network.outputLayer[i]->readWeights(s);
-        ++n;
-    }
-    for (size_t i = 0; i < NetworkParams::OUTPUT_BUCKETS && s.good(); ++i) {
-        network.outputLayer[i]->readBiases(s);
-        ++n;
-    }
-    expected = 2*NetworkParams::OUTPUT_BUCKETS;
-#endif
     if (n != expected) {
         s.setstate(std::ios::failbit);
     }
+#else
+    // read feature layer
+    (void)network.transformer->read(s);
+    if (s.fail()) return s;
+    (void)network.outputLayer->read(s);
+#endif
     return s;
 }
 
