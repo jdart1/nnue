@@ -131,6 +131,25 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
         return s;
     }
 
+    virtual std::ostream &write(std::ostream &s, const WeightType (&weights)[buckets][outputSize][roundedInputSize],
+                                const BiasType (&biases)[buckets][outputSize]) {
+        // Weights first, then biases
+        // serialized in column order
+        for (size_t b = 0; b < buckets; ++b) {
+            for (size_t i = 0; i < outputSize; ++i) {
+                for (size_t j = 0; j < roundedInputSize; ++j) {
+                    s << weights[b][i][j];
+                }
+            }
+        }
+        for (size_t b = 0; b < buckets; ++b) {
+            for (size_t i = 0; i < outputSize; ++i) {
+                s << biases[b][i];
+            }
+        }
+        return s;
+    }
+
     virtual const BiasType *getBiases(size_t bucket) const noexcept { return _biases[bucket]; }
 
     virtual const WeightType *getCol(size_t bucket, size_t col) const noexcept { return _weights[bucket][col]; }
