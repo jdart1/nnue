@@ -105,49 +105,10 @@ class Network {
 };
 
 inline std::istream &operator>>(std::istream &s, Network &network) {
-#ifdef STOCKFISH_FORMAT
-    std::uint32_t version, size;
-    version = read_little_endian<uint32_t>(s);
-    // TBD: validate hash
-    (void)read_little_endian<uint32_t>(s);
-    size = read_little_endian<uint32_t>(s); // size of
-                                            // architecture string
-    std::stringstream str;
-    if (!s.good()) {
-        return s;
-    } else if (version != NetworkParams::NN_VERSION) {
-        s.setstate(std::ios::failbit);
-        return s;
-    }
-    network.version = version;
-    char c;
-    for (uint32_t i = 0; i < size; i++) {
-        if (!s.get(c))
-            break;
-        str << c;
-    }
-    network.architecture = str.str();
-#endif
-#ifdef STOCKFISH_FORMAT
-    // TBD: remove
-    // read num buckets x layers
-    unsigned n = 0, expected = 0;
-    for (size_t i = 0; i < NetworkParams::OUTPUT_BUCKETS && s.good(); ++i) {
-        // skip next 4 bytes (hash)
-        (void)read_little_endian<uint32_t>(s);
-        network.outputLayer[i]->read(s);
-        ++n;
-    }
-    expected = NetworkParams::OUTPUT_BUCKETS;
-    if (n != expected) {
-        s.setstate(std::ios::failbit);
-    }
-#else
     // read feature layer
     (void)network.transformer->read(s);
     if (s.fail()) return s;
     (void)network.outputLayer->read(s);
-#endif
     return s;
 }
 

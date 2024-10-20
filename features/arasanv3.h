@@ -93,18 +93,6 @@ public:
 #ifdef NNUE_TRACE
        int min_weight = 1<<30, max_weight = -(1<<30), min_bias = 1<<30, max_bias = -(1<<30);
 #endif
-#ifdef STOCKFISH_FORMAT
-        // read hash
-        (void)read_little_endian<uint32_t>(s);
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            _biases[i] = read_little_endian<BiasType>(s);
-        }
-        for (size_t i = 0; i < inputSize && s.good(); ++i) {
-            for (size_t j = 0; j < outputSize && s.good(); ++j) {
-                _weights[i][j] = read_little_endian<WeightType>(s);
-            }
-        }
-#else
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
             for (size_t j = 0; j < outputSize && s.good(); ++j) {
                 _weights[i][j] = read_little_endian<WeightType>(s);
@@ -121,7 +109,6 @@ public:
             if (_biases[i] > max_bias) max_bias = _biases[i];
 #endif
         }
-#endif
 #ifdef _DEBUG
         if (!s.good()) std::cout << strerror(errno) << std::endl;
 #endif

@@ -4,6 +4,9 @@
 
 #include "nndefs.h"
 #include "typed.h"
+#ifdef NNUE_TRACE
+#include <array>
+#endif
 
 // This class defines a linear transformation layer of the NNUE.
 //
@@ -69,22 +72,15 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
     }
 
     virtual std::istream &read(std::istream &s) {
-#ifdef STOCKFISH_FORMAT
-        // Note: linear layers are stored in column order
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            _biases[i] = read_little_endian<BiasType>(s);
-        }
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            for (size_t j = 0; j < roundedInputSize && s.good(); ++j) {
-                _weights[i][j] = read_little_endian<WeightType>(s);
-            }
-        }
-#else
 #ifdef NNUE_TRACE
-        int min_weights[buckets] = {1 << 30};
-        int max_weights[buckets] = {-(1 << 30)};
-        int min_biases[buckets] = {1 << 30};
-        int max_biases[buckets] = { -(1 << 30) };
+        std::array<int,buckets> min_weights;
+        std::array<int,buckets> max_weights;
+        std::array<int,buckets> min_biases;
+        std::array<int,buckets> max_biases;
+        min_weights.fill(1<<30);
+        min_biases.fill(1<<30);
+        max_weights.fill(-(1<<30));
+        max_biases.fill(-(1<<30));
 #endif
         // bullet format. Weights are in a matrix ordered with 1st
         // dimension weights, 2nd dimension buckets. We want 1st
@@ -92,9 +88,8 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
         // efficiency. So do that transformation here.
         for (size_t i = 0; i < inputSize && s.good(); ++i) {
             for (size_t b = 0; b < buckets; ++b) {
+                // TBD: bullet format for outputSize > 1?
                 for (size_t j = 0; j < outputSize && s.good(); ++j) {
-                    // flip rows and columns for easier computation
-                    // TBD: needed for bullet?
                     _weights[b][j][i] = read_little_endian<WeightType>(s);
 #ifdef NNUE_TRACE
                     if (_weights[b][j][i] < min_weights[b])
@@ -105,7 +100,7 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
                 }
             }
         }
-        // similary, biases are stored as outputSize x buckets
+        // similarly, biases are stored as outputSize x buckets
         for (size_t i = 0; i < outputSize && s.good(); ++i) {
             for (size_t b = 0; b < buckets; ++b) {
                 _biases[b][i] = read_little_endian<BiasType>(s);
@@ -117,7 +112,6 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
 #endif
             }
         }
-#endif
 #ifdef NNUE_TRACE
         if (!s.fail()) {
             std::cout << "linear layer stats by bucket" << std::endl;
