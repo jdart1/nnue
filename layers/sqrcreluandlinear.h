@@ -11,7 +11,7 @@
 // If saturate = false, the input is just squared, asssuming no saturation. This will be true if the inputs are
 // clamped to <=181 = square root of 32768.
 template <typename AccumulatorType, typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
-          unsigned clampMax, size_t NETWORK_QA, size_t buckets, bool saturate, size_t alignment = DEFAULT_ALIGN>
+          int clampMax, int NETWORK_QA, size_t buckets, bool saturate, size_t alignment = DEFAULT_ALIGN>
 class SqrCReLUAndLinear
     : public LinearLayer<InputType, WeightType, BiasType, OutputType, inputSize, 1, buckets, alignment> {
   public:
@@ -51,7 +51,8 @@ class SqrCReLUAndLinear
                     // CReLU
                     x = std::clamp<int16_t>(x, 0, clampMax);
                     if constexpr (saturate) {
-                        sum += std::clamp<int32_t>(this->_weights[bucket][0][i + offset] * x,-32767,32768) * x;
+                        sum += std::clamp<int32_t>(this->_weights[bucket][0][i + offset] * x,
+                                                   -32767,32768) * x;
                     }
                     else {
                         // square and sum
