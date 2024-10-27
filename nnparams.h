@@ -4,7 +4,7 @@
 
 struct NetworkParams {
 
-static constexpr unsigned KING_BUCKETS = 7;
+static constexpr unsigned KING_BUCKETS = 13;
 
 static constexpr unsigned OUTPUT_BUCKETS = 8;
 
@@ -22,13 +22,13 @@ static constexpr int OUTPUT_SCALE = 400;
 // clang-format off
 static constexpr unsigned KING_BUCKETS_MAP[] = {
     0, 0, 1, 1, 1, 1, 0, 0,
-    2, 2, 2, 2, 2, 2, 2, 2,
-    3, 3, 3, 3, 3, 3, 3, 3,
-    4, 4, 4, 4, 4, 4, 4, 4,
-    5, 5, 5, 5, 5, 5, 5, 5,
-    5, 5, 5, 5, 5, 5, 5, 5,
-    6, 6, 6, 6, 6, 6, 6, 6,
-    6, 6, 6, 6, 6, 6, 6, 6};
+    2, 3, 4, 4, 4, 4, 3, 2,
+    5, 5, 6, 6, 6, 6, 5, 5,
+    7, 7, 8, 8, 8, 8, 7, 7,
+    9, 9, 10, 10, 10, 10, 9, 9,
+    9, 9, 10, 10, 10, 10, 9, 9,
+    11, 11, 12, 12, 12, 12, 11, 11,
+    11, 11, 12, 12, 12, 12, 11, 11};
 // clang-format on
 
 // version of the network
