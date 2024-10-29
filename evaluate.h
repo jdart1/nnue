@@ -6,13 +6,23 @@ template <typename ChessInterface> class Evaluator {
 public:
     template <Color kside>
     static size_t getIndices(const ChessInterface &intf, IndexArray &out) {
+#ifdef NNUE_TRACE
+        std::cout << (kside == White ? "White" : "Black") << " indices:" << std::endl;
+#endif
         IndexArray::iterator it = out.begin();
         for (const auto &pair : intf) {
             const Square &sq = pair.first;
             const Piece &piece = pair.second;
+#ifdef NNUE_TRACE
+            std::cout << Network::getIndex<kside>(intf.kingSquare(kside),
+                                                  piece, sq) << ' ';
+#endif
             *it++ = Network::getIndex<kside>(intf.kingSquare(kside),
                                              piece, sq);
         }
+#ifdef NNUE_TRACE
+        std::cout << std::endl;
+#endif
         *it = LAST_INDEX;
         return it - out.begin();
     }
@@ -141,11 +151,6 @@ public:
         // a valid Node pointer in it.
         Network::AccumulatorType accum;
         updateAccum(network, intf, accum);
-#ifdef NNUE_TRACE
-        std::cout << "full evaluate" << std::endl;
-        std::cout << "output bucket=" << getOutputBucket(intf) << std::endl;
-        std::cout << accum << std::endl;
-#endif
         return network.evaluate(accum, intf.sideToMove(), getOutputBucket(intf));
     }
 

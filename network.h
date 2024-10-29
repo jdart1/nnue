@@ -53,7 +53,7 @@ class Network {
         alignas(nnue::DEFAULT_ALIGN) std::byte buffer[BUFFER_SIZE];
         // propagate data through the remaining layers
 #ifdef NNUE_TRACE
-        std::cout << "bucket=" << bucket << std::endl;
+        std::cout << "output bucket=" << bucket << std::endl;
         std::cout << "accumulator:" << std::endl;
         std::cout << accum << std::endl;
 #endif
