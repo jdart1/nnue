@@ -20,7 +20,7 @@ class Network {
 
     using OutputType = int32_t;
     using FeatureXformer = ArasanV3Feature<uint16_t, int16_t, int16_t, int16_t, FeatureXformerRows,
-                                           NetworkParams::HIDDEN_WIDTH>;
+        NetworkParams::HIDDEN_WIDTH, NetworkParams::KING_BUCKETS_MAP>;
     using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
     using OutputLayer = SqrCReLUAndLinear<AccumulatorType, int16_t, int16_t, int16_t, OutputType,

@@ -15,6 +15,8 @@ enum class AccumulatorState { Empty, Computed };
 template <typename OutputType, size_t size, size_t alignment = DEFAULT_ALIGN>
 class Accumulator {
   public:
+    static constexpr AccumulatorHalf halves[2] = {AccumulatorHalf::Lower, AccumulatorHalf::Upper};
+
     typedef const OutputType (*OutputPtr)[size];
 
     Accumulator() { _states[0] = _states[1] = AccumulatorState::Empty; }

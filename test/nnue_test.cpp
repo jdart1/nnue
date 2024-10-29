@@ -16,6 +16,8 @@
 #include <vector>
 
 #include "../interface/chessint.h"
+#include "nndefs.h"
+#include "nnparams.h"
 
 // Unit tests for nnue code
 
@@ -138,18 +140,39 @@ static const std::unordered_map<char, nnue::Piece> pieceMap = {
 // parameters
 class ArasanV3Feature {
   public:
+
     static constexpr size_t OutputSize = 1024;
 
-    static constexpr size_t InputSize = 22 * OutputSize;
+    static constexpr size_t InputSize = nnue::NetworkParams::KING_BUCKETS * 12 * 64;
 
     using OutputType = int16_t;
 
     using FeatureXformer =
-        nnue::ArasanV3Feature<uint16_t, int16_t, int16_t, int16_t, InputSize, OutputSize>;
+        nnue::ArasanV3Feature<uint16_t, int16_t, int16_t, int16_t, InputSize, OutputSize,
+                              nnue::NetworkParams::KING_BUCKETS_MAP>;
 
     using AccumulatorType = FeatureXformer::AccumulatorType;
 
-    ArasanV3Feature() : layer1(new FeatureXformer()) {}
+    ArasanV3Feature() : layer1(new FeatureXformer()) {
+        // set feature weights
+        std::array<int16_t,ArasanV3Feature::OutputSize> zero_col;
+        zero_col.fill(0);
+        for (size_t i = 0; i < ArasanV3Feature::InputSize; ++i) {
+            layer1.get()->setCol(i, zero_col.data());
+        }
+        for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
+            col1[i] = 4 * (i % 5) - 5 * (i % 3);
+            col2[i] = 10 * (i % 4) - 8 * (i % 5);
+            col3[i] = 6 * (i % 5) - 5 * (i % 3);
+            col4[i] = 10 * (i % 5) - 8 * ((i + 1) % 5);
+            biases[i] = 5 - 8 * (i % 3) + 10 * (i % 4);
+        }
+        layer1.get()->setCol(199, col1);
+        layer1.get()->setCol(137, col2);
+        layer1.get()->setCol(2939, col3);
+        layer1.get()->setCol(2726, col4);
+        layer1.get()->setBiases(biases);
+    }
 
     AccumulatorType accum;
 
@@ -157,18 +180,17 @@ class ArasanV3Feature {
 
     FeatureXformer *get() const noexcept { return layer1.get(); }
 
+    int16_t col1[ArasanV3Feature::OutputSize];
+    int16_t col2[ArasanV3Feature::OutputSize];
+    int16_t col3[ArasanV3Feature::OutputSize];
+    int16_t col4[ArasanV3Feature::OutputSize];
+    int16_t biases[ArasanV3Feature::OutputSize];
+
   private:
     std::unique_ptr<FeatureXformer> layer1;
 };
 
-static int16_t col1[ArasanV3Feature::OutputSize];
-static int16_t col2[ArasanV3Feature::OutputSize];
-static int16_t col3[ArasanV3Feature::OutputSize];
-static int16_t col4[ArasanV3Feature::OutputSize];
-static int16_t zero_col[ArasanV3Feature::OutputSize] = {0};
-static int16_t biases[ArasanV3Feature::OutputSize];
-
-static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexType> &w_expected,
+static int testIndices(const std::string &fen, std::unordered_set<nnue::IndexType> &w_expected,
                        std::unordered_set<nnue::IndexType> &b_expected) {
     Position p(fen);
     ChessInterface intf(&p);
@@ -176,6 +198,16 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
     nnue::IndexArray wIndices, bIndices;
     auto wCount = nnue::Evaluator<ChessInterface>::getIndices<nnue::White>(intf, wIndices);
     auto bCount = nnue::Evaluator<ChessInterface>::getIndices<nnue::Black>(intf, bIndices);
+    /*
+    std::cout << "White" << std::endl;
+    for (size_t i = 0; i < wCount; ++i)
+        std::cout << wIndices[i] << ' ';
+    std::cout << std::endl;
+    std::cout << "Black" << std::endl;
+    for (size_t i = 0; i < bCount; ++i)
+        std::cout << bIndices[i] << ' ';
+    std::cout << std::endl;
+    */
 
     int errs = 0;
     for (auto it = wIndices.begin(); it != wIndices.begin() + wCount; it++) {
@@ -208,31 +240,29 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
         }
         std::cerr << std::endl;
     }
+    return errs;
+}
+
+static int testLayers() {
+    int errs = 0;
 
     ArasanV3Feature feature;
 
     ArasanV3Feature::AccumulatorType accum;
 
-    for (size_t i = 0; i < ArasanV3Feature::InputSize; ++i)
-        feature.get()->setCol(i, zero_col);
+    static const nnue::IndexArray wIndices = {137, 199, nnue::LAST_INDEX};
+    static const nnue::IndexArray bIndices = {2726, 2939, nnue::LAST_INDEX};
 
-    feature.get()->setCol(36, col1);
-    feature.get()->setCol(686, col2);
-    feature.get()->setCol(1748, col3);
-    feature.get()->setCol(2097, col4);
-    feature.get()->setBiases(biases);
-
-    feature.get()->updateAccum(bIndices, nnue::AccumulatorHalf::Lower, accum);
-    feature.get()->updateAccum(wIndices, nnue::AccumulatorHalf::Upper, accum);
+    feature.get()->updateAccum(wIndices, nnue::AccumulatorHalf::Lower, accum);
+    feature.get()->updateAccum(bIndices, nnue::AccumulatorHalf::Upper, accum);
 
     ArasanV3Feature::OutputType expected[2][ArasanV3Feature::OutputSize];
     for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
-        expected[0][i] = col3[i] + col4[i] + biases[i];
-        expected[1][i] = col1[i] + col2[i] + biases[i];
+        expected[0][i] = feature.col1[i] + feature.col2[i] + feature.biases[i];
+        expected[1][i] = feature.col3[i] + feature.col4[i] + feature.biases[i];
     }
-    static const nnue::AccumulatorHalf halves[2] = {nnue::AccumulatorHalf::Lower,
-                                                    nnue::AccumulatorHalf::Upper};
-    for (auto h : halves) {
+
+    for (auto h : ArasanV3Feature::AccumulatorType::halves) {
         for (size_t i = 0; i < ArasanV3Feature::OutputSize; ++i) {
             auto exp = expected[h == nnue::AccumulatorHalf::Lower ? 0 : 1][i];
             if (exp != accum.getOutput(h)[i]) {
@@ -243,27 +273,44 @@ static int testFeature(const std::string &fen, std::unordered_set<nnue::IndexTyp
         }
     }
 
-    // Test output layer
+    constexpr int NETWORK_QA = 511;
+    constexpr size_t HIDDEN_SIZE = ArasanV3Feature::OutputSize * 2;
+
+    // Test output layer, 1 bucket
+
     nnue::SqrCReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
-                            ArasanV3Feature::OutputSize * 2, 255, 255, 1, true>
+                            HIDDEN_SIZE, NETWORK_QA, NETWORK_QA, 1, true>
         outputLayer;
+
+    // set some weights
+    int16_t weights[HIDDEN_SIZE];
+    int16_t bias = 10;
+    for (size_t i = 0; i < HIDDEN_SIZE; ++i) {
+        int j = static_cast<int>(i);
+        weights[i] = 20*(j % 3) - 30*(j % 4);
+    }
+    outputLayer.setCol(0, 0, weights);
+    // set bias
+    outputLayer.setBiases(0,&bias);
 
     int32_t out, out2;
     outputLayer.postProcessAccum(accum, 0, &out);
     // compare output with generic implementation
     size_t offset = 0;
     int32_t sum = 0;
-    for (auto h : halves) {
+    for (auto h : ArasanV3Feature::AccumulatorType::halves) {
         for (size_t i = 0; i < accum.getSize(); ++i) {
             int16_t x = accum.getOutput(h)[i];
             // CReLU
-            x = std::clamp<int16_t>(x, 0, 255);
-            // multiply with saturation then square
-            sum += ((outputLayer.getCol(0,0)[i + offset] * x) & 0xffff) * x;
+            x = std::clamp<int16_t>(x, 0, NETWORK_QA);
+            // multiply with weight then square
+            auto w = outputLayer.getCol(0,0)[i + offset];
+            sum += std::clamp<int32_t>(w * x, -32767,32768) * x;
+            //sum += ((outputLayer.getCol(0,0)[i + offset] * x) & 0xffff) * x;
         }
         offset += accum.getSize();
     }
-    out2 = (sum / 255) + *(feature.get()->getBiases());
+    out2 = (sum / NETWORK_QA) + *(outputLayer.getBiases(0));
     if (out != out2) {
         std::cerr << "error in output layer" << std::endl;
         std::cerr << out << ' ' << out2 << std::endl;
@@ -395,13 +442,14 @@ static int test_incremental() {
     nnue::Network network;
 
     // set some weights
+    ArasanV3Feature::OutputType col[nnue::Network::FeatureXformerOutputSize];
     for (size_t i = 0; i < nnue::Network::FeatureXformerRows; i++) {
-        ArasanV3Feature::OutputType col[nnue::Network::FeatureXformerOutputSize];
         for (size_t j = 0; j < nnue::Network::FeatureXformerOutputSize; j++) {
             col[j] = (i + j) % 10 - 5;
         }
         network.getTransformer()->setCol(i, col);
     }
+    network.getTransformer()->setBiases(col);
 
     int errs = 0;
 
@@ -455,19 +503,25 @@ int main(int argc, char **argv) {
     errs += test_linear<16, 16>();
     errs += test_linear<32, 1>();
     errs += test_incremental();
-    std::unordered_set<nnue::IndexType> w_expected{199,195,321,10,137,17,30,413,24,422,36,483,288,686,620,426,424,434,753,635};
-
-    std::unordered_set<nnue::IndexType> b_expected{2175,2171,2297,1970,2097,1961,1958,1573,1952,1566,1948,1627,2200,1814,1748,1554,1552,1546,1865,1731};
-
-    errs += testFeature("4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -", w_expected,
+    std::unordered_set<nnue::IndexType> w_expected{199, 195, 321, 10,  137, 17,  30,
+                                                   413, 24,  422, 36,  483, 288, 686,
+                                                   620, 426, 424, 434, 753, 635};
+    std::unordered_set<nnue::IndexType> b_expected{2943, 2939, 3065, 2738, 2865, 2729, 2726,
+                                                   2341, 2720, 2334, 2716, 2395, 2968, 2582,
+                                                   2516, 2322, 2320, 2314, 2633, 2499};
+    errs += testIndices("4r3/5pk1/1q1r1p1p/1p1Pn2Q/1Pp4P/6P1/5PB1/R3R1K1 b - -", w_expected,
                         b_expected);
-    std::unordered_set<nnue::IndexType> w_expected2{
-        199,194,321,269,11,10,137,8,22,82,17,154,422,421,548,686,427,424,439,500,434,433,639,763,570,632};
+    std::unordered_set<nnue::IndexType> w_expected2{199, 194, 321, 269, 11,  10,  137, 8,   22,
+                                                    82,  17,  154, 422, 421, 548, 686, 427, 424,
+                                                    439, 500, 434, 433, 639, 763, 570, 632};
     std::unordered_set<nnue::IndexType> b_expected2{
-        1407,1402,1529,1461,1203,1202,1329,1200,1198,1258,1193,1314,798,797,924,1046,787,784,783,844,778,777,967,1091,898,960};
+        1407, 1402, 1529, 1461, 1203, 1202, 1329, 1200, 1198, 1258, 1193, 1314, 798,
+        797,  924,  1046, 787,  784,  783,  844,  778,  777,  967,  1091, 898,  960};
 
-    errs += testFeature("r3kb1r/p2n1pp1/1q2p2p/1ppb4/5B2/1P3NP1/2Q1PPBP/R4RK1 w kq -", w_expected2,
+    errs += testIndices("r3kb1r/p2n1pp1/1q2p2p/1ppb4/5B2/1P3NP1/2Q1PPBP/R4RK1 w kq -", w_expected2,
                         b_expected2);
+
+    errs += testLayers();
 
     //    errs += test_CReLU<16>();
     //    errs += test_CReLU<32>();

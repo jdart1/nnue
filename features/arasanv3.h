@@ -10,7 +10,7 @@
 // Implements the feature transformer for the "Arasan v3" neural network architecture.
 // King position is mirrored so that the King is always on files e..h.
 template <typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
-          size_t outputSize, size_t alignment = DEFAULT_ALIGN>
+          size_t outputSize, const unsigned kingBucketsMap[64], size_t alignment = DEFAULT_ALIGN>
 class ArasanV3Feature
 {
 public:
@@ -34,7 +34,7 @@ public:
         }
         sq = relativeSquare(kside, sq);
         kp = relativeSquare(kside, kp);
-        IndexType idx = static_cast<IndexType>(NetworkParams::KING_BUCKETS_MAP[kp] * 12 * 64 +
+        IndexType idx = static_cast<IndexType>(kingBucketsMap[kp] * 12 * 64 +
                                                pieceTypeMap[kside != colorOfPiece(p)][p] * 64 +
                                                sq);
         assert(idx < inputSize);
@@ -141,8 +141,8 @@ public:
 
     static inline bool needsRefresh(Color perspective, Square oldKing, Square newKing) {
         return ((fileOf(oldKing) >= E_FILE) != (fileOf(newKing) >= E_FILE)) ||
-            NetworkParams::KING_BUCKETS_MAP[relativeSquare(perspective, oldKing)] !=
-            NetworkParams::KING_BUCKETS_MAP[relativeSquare(perspective, newKing)];
+            kingBucketsMap[relativeSquare(perspective, oldKing)] !=
+            kingBucketsMap[relativeSquare(perspective, newKing)];
     }
 
 private:
