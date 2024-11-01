@@ -3,13 +3,14 @@
 #define _ARASANV3_H
 
 #include "nndefs.h"
+#include "nnparams.h"
 #include "accum.h"
 #include "util.h"
 
 // Implements the feature transformer for the "Arasan v3" neural network architecture.
-// This feature uses 5 king buckets. King position is mirrored so that the King is always on files e..h.
+// King position is mirrored so that the King is always on files e..h.
 template <typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
-          size_t outputSize, size_t alignment = DEFAULT_ALIGN>
+          size_t outputSize, const unsigned kingBucketsMap[64], size_t alignment = DEFAULT_ALIGN>
 class ArasanV3Feature
 {
 public:
@@ -89,29 +90,33 @@ public:
 
     // read weights from a stream
     virtual std::istream &read(std::istream &s) {
-#ifdef STOCKFISH_FORMAT
-        // read hash
-        (void)read_little_endian<uint32_t>(s);
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            _biases[i] = read_little_endian<BiasType>(s);
-        }
-        for (size_t i = 0; i < inputSize && s.good(); ++i) {
-            for (size_t j = 0; j < outputSize && s.good(); ++j) {
-                _weights[i][j] = read_little_endian<WeightType>(s);
-            }
-        }
-#else
-        for (size_t i = 0; i < inputSize && s.good(); ++i) {
-            for (size_t j = 0; j < outputSize && s.good(); ++j) {
-                _weights[i][j] = read_little_endian<WeightType>(s);
-            }
-        }
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            _biases[i] = read_little_endian<BiasType>(s);
-        }
+#ifdef NNUE_TRACE
+       int min_weight = 1<<30, max_weight = -(1<<30), min_bias = 1<<30, max_bias = -(1<<30);
 #endif
+        for (size_t i = 0; i < inputSize && s.good(); ++i) {
+            for (size_t j = 0; j < outputSize && s.good(); ++j) {
+                _weights[i][j] = read_little_endian<WeightType>(s);
+#ifdef NNUE_TRACE
+                if (_weights[i][j] < min_weight) min_weight = _weights[i][j];
+                if (_weights[i][j] > max_weight) max_weight = _weights[i][j];
+#endif
+            }
+        }
+        for (size_t i = 0; i < outputSize && s.good(); ++i) {
+            _biases[i] = read_little_endian<BiasType>(s);
+#ifdef NNUE_TRACE
+            if (_biases[i] < min_bias) min_bias = _biases[i];
+            if (_biases[i] > max_bias) max_bias = _biases[i];
+#endif
+        }
 #ifdef _DEBUG
         if (!s.good()) std::cout << strerror(errno) << std::endl;
+#endif
+#ifdef NNUE_TRACE
+        if (!s.fail()) {
+            std::cout << "min feature weight = " << min_weight << " max feature weight = " << max_weight << std::endl;
+            std::cout << "min feature bias = " << min_bias << " max feature bias = " << max_bias << std::endl;
+        }
 #endif
         return s;
     }
@@ -136,25 +141,14 @@ public:
 
     static inline bool needsRefresh(Color perspective, Square oldKing, Square newKing) {
         return ((fileOf(oldKing) >= E_FILE) != (fileOf(newKing) >= E_FILE)) ||
-            kingBucketsMap[relativeSquare(perspective, oldKing)] != kingBucketsMap[relativeSquare(perspective, newKing)];
+            kingBucketsMap[relativeSquare(perspective, oldKing)] !=
+            kingBucketsMap[relativeSquare(perspective, newKing)];
     }
 
 private:
     static constexpr unsigned pieceTypeMap[2][16] = {
                                                      {0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 0},
                                                      {0, 6, 7, 8, 9, 10, 11, 0, 0, 6, 7, 8, 9, 10, 11, 0}};
-
-    // clang-format off
-    static constexpr unsigned kingBucketsMap[] = {
-        0, 0, 1, 1, 1, 1, 0, 0,
-        2, 2, 2, 2, 2, 2, 2, 2,
-        3, 3, 3, 3, 3, 3, 3, 3,
-        4, 4, 4, 4, 4, 4, 4, 4,
-        5, 5, 5, 5, 5, 5, 5, 5,
-        5, 5, 5, 5, 5, 5, 5, 5,
-        6, 6, 6, 6, 6, 6, 6, 6,
-        6, 6, 6, 6, 6, 6, 6, 6};
-    // clang-format on
 
     alignas(alignment) BiasType _biases[outputSize];
     alignas(alignment) WeightType _weights[inputSize][outputSize];
