@@ -14,8 +14,6 @@ using IndexType = unsigned;
 
 static constexpr IndexType LAST_INDEX = 1000000;
 
-// Quantization factors
-
 using IndexArray = std::array<IndexType,MAX_INDICES>;
 
 #endif
