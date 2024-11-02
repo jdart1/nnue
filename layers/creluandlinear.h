@@ -32,7 +32,7 @@ class CReLUAndLinear
                                       (accum.getOutput(AccumulatorHalf::Upper), output, clampMax,
                                        this->_weights[bucket][0] + inputSize / 2);
             sum += *output;
-            output[0] = (sum / NETWORK_QA) + this->_biases[bucket][0];
+            output[0] = sum + this->_biases[bucket][0];
         } else
 #endif
         {
@@ -49,11 +49,10 @@ class CReLUAndLinear
                 }
                 offset += accum.getSize();
             }
-            output[0] = (sum / NETWORK_QA) + this->_biases[bucket][0];
+            output[0] = sum + this->_biases[bucket][0];
         }
 #ifdef NNUE_TRACE
         std::cout << "---- CReLUAndLinear output " << std::endl;
-        std::cout << " prescaled = " << sum << " unsquared = " << output[0] << std::endl;
         for (size_t i = 0; i < 1 /*outputSize */; ++i) {
             std::cout << static_cast<int>(output[i]) << ' ';
             if ((i + 1) % 64 == 0)
