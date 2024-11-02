@@ -6,7 +6,7 @@
 #include "nnparams.h"
 #include "features/arasanv3.h"
 #include "layers/linear.h"
-#include "layers/sqrcreluandlinear.h"
+#include "layers/creluandlinear.h"
 #include "util.h"
 
 class Network {
@@ -23,9 +23,9 @@ class Network {
         NetworkParams::HIDDEN_WIDTH, NetworkParams::KING_BUCKETS_MAP>;
     using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using OutputLayer = SqrCReLUAndLinear<AccumulatorType, int16_t, int16_t, int16_t, OutputType,
-                                          NetworkParams::HIDDEN_WIDTH * 2, NetworkParams::NETWORK_QA,
-                                          NetworkParams::NETWORK_QA, NetworkParams::OUTPUT_BUCKETS, true>;
+    using OutputLayer = CReLUAndLinear<AccumulatorType, int16_t, int16_t, int16_t, OutputType,
+                                       NetworkParams::HIDDEN_WIDTH * 2, NetworkParams::NETWORK_QA,
+                                       NetworkParams::NETWORK_QA, NetworkParams::OUTPUT_BUCKETS>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
