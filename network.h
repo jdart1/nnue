@@ -14,6 +14,7 @@ class Network {
     template <typename ChessInterface> friend class Evaluator;
 
   public:
+
     static constexpr size_t FeatureXformerOutputSize = NetworkParams::HIDDEN_WIDTH;
 
     static constexpr size_t FeatureXformerRows = 12 * NetworkParams::KING_BUCKETS * 64;
