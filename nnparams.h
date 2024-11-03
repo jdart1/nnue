@@ -4,7 +4,7 @@
 
 struct NetworkParams {
 
-static constexpr unsigned KING_BUCKETS = 13;
+static constexpr unsigned KING_BUCKETS = 7;
 
 static constexpr unsigned OUTPUT_BUCKETS = 8;
 
