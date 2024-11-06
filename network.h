@@ -5,8 +5,9 @@
 #include "accum.h"
 #include "nnparams.h"
 #include "features/arasanv3.h"
-#include "layers/linear.h"
+// for testing include >1 layer type
 #include "layers/creluandlinear.h"
+#include "layers/sqrcreluandlinear.h"
 #include "util.h"
 
 class Network {
@@ -86,10 +87,6 @@ class Network {
         transformer->updateAccum(indices, half, output);
     }
 
-    const std::string &getArchitecture() const noexcept {
-        return architecture;
-    }
-
     uint32_t getVersion() const noexcept {
         return version;
     }
@@ -101,14 +98,23 @@ class Network {
   protected:
     FeatureXformer *transformer;
     OutputLayer *outputLayer;
-    std::string architecture;
     uint32_t version;
 };
 
 inline std::istream &operator>>(std::istream &s, Network &network) {
+    /* TBD
+    // Arasan network files start with a 4-byte version
+    network.version = read_little_endian<uint32_t>(s);
+    if (s.fail()) return s;
+    if (network.version != NetworkParams::NN_VERSION) {
+        s.setstate(std::ios::failbit);
+        return s;
+    }
+    */
     // read feature layer
     (void)network.transformer->read(s);
     if (s.fail()) return s;
+    // read bucketed output layer
     (void)network.outputLayer->read(s);
     return s;
 }

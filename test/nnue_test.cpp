@@ -312,7 +312,37 @@ static int testLayers() {
     }
     out2 = (sum / NETWORK_QA) + *(outputLayer.getBiases(0));
     if (out != out2) {
-        std::cerr << "error in output layer" << std::endl;
+        std::cerr << "error in output layer (SqrCReLUAndLinear)" << std::endl;
+        std::cerr << out << ' ' << out2 << std::endl;
+        ++errs;
+    }
+
+    // test CRelU layer too
+    nnue::CReLUAndLinear<ArasanV3Feature::AccumulatorType, int16_t, int16_t, int16_t, int32_t,
+                         HIDDEN_SIZE, NETWORK_QA, NETWORK_QA, 1> outputLayer2;
+
+    outputLayer2.setCol(0, 0, weights);
+    // set bias
+    outputLayer2.setBiases(0,&bias);
+
+    outputLayer2.postProcessAccum(accum, 0, &out);
+    // compare output with generic implementation
+    offset = 0;
+    sum = 0;
+    for (auto h : ArasanV3Feature::AccumulatorType::halves) {
+        for (size_t i = 0; i < accum.getSize(); ++i) {
+            int16_t x = accum.getOutput(h)[i];
+            // CReLU
+            x = std::clamp<int16_t>(x, 0, NETWORK_QA);
+            // multiply with weight
+            auto w = outputLayer.getCol(0,0)[i + offset];
+            sum += w * x;
+        }
+        offset += accum.getSize();
+    }
+    out2 = sum + *(outputLayer.getBiases(0));
+    if (out != out2) {
+        std::cerr << "error in output layer (CReLUAndLinear)" << std::endl;
         std::cerr << out << ' ' << out2 << std::endl;
         ++errs;
     }

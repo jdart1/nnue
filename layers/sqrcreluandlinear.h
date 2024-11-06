@@ -2,7 +2,7 @@
 #ifndef _NNUE_SQRCRELUANDLINEAR_H
 #define _NNUE_SQRCRELUANDLINEAR_H
 
-#include "typed.h"
+#include "linear.h"
 
 // This combines both a SqrCReLU operation and a linear layer with output size one, the (single) hidden layer
 // in the Arasan V3 architecture. TBD: generalize to larger output sizes.
