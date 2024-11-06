@@ -156,7 +156,7 @@ public:
 
     static unsigned getOutputBucket(const ChessInterface &intf) {
         // range is 0..7
-        return (intf.pieceCount() - 2)/4;
+        return (intf.pieceCount() - 2)/NetworkParams::BUCKET_DIVISOR;
     }
 
     // full evaluation of accumulator, update into 3rd argument
