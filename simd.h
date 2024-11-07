@@ -985,9 +985,9 @@ static inline void CRelUAndLinear(const InType *input, OutType *output,
     const vec_t maxValues = vec_set_16(clampMax);
     vec_t sum = zero;
     const vec_t *inp = reinterpret_cast<const vec_t*>(input);
+    const vec_t *w = reinterpret_cast<const vec_t *>(weights);
     constexpr size_t iterations = chunks<InType, simdWidth>(inputSize);
     for (size_t i = 0; i < iterations; ++i) {
-        const vec_t *w = reinterpret_cast<const vec_t *>(weights);
         vec_t x = vec_clamp(vec_load(inp + i), maxValues);
         // 16bit x 16bit multiplication with weights, add to 32 bit accumulator
         sum = vec_add32(sum, vec_madd16(x, vec_load(w+i)));
