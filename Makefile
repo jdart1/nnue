@@ -28,20 +28,19 @@ BUILD = build
 EXPORT = build
 
 NNUE_SOURCES = nnue_test.cpp chessint.cpp
+UTIL_SOURCES = add_nn_version.cpp
 NNUE_OBJS    = $(patsubst %.cpp, $(BUILD)/%.o, $(NNUE_SOURCES))
-NNUE_ASM    = $(patsubst %.cpp, $(BUILD)/%.s, $(NNUE_SOURCES))
+UTIL_OBJS    = $(patsubst %.cpp, $(BUILD)/%.o, $(UTIL_SOURCES))
 
-default: $(EXPORT)/nnue_test
+default: $(EXPORT)/nnue_test $(EXPORT)/add_nn_version
 
 dirs:
 	mkdir -p $(BUILD)
 
-asm: $(NNUE_ASM)
-
 clean: dirs
 	rm -f $(BUILD)/*.o
 	rm -f $(BUILD)/*.s
-	cd $(EXPORT) && rm -f nnue_test
+	cd $(EXPORT) && rm -f *
 
 $(BUILD)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(OPT) $(DEBUG) $(CFLAGS) -c -o $@ $<
@@ -52,9 +51,14 @@ $(BUILD)/%.o: layers/%.cpp
 $(BUILD)/%.o: test/%.cpp
 	$(CXX) $(CXXFLAGS) $(OPT) $(DEBUG) $(CFLAGS) -c -o $@ $<
 
+$(BUILD)/%.o: util/%.cpp
+	$(CXX) $(CXXFLAGS) $(OPT) $(DEBUG) $(CFLAGS) -c -o $@ $<
+
 $(BUILD)/%.o: interface/%.cpp
 	$(CXX) $(CXXFLAGS) $(OPT) $(DEBUG) $(CFLAGS) -c -o $@ $<
 
 $(EXPORT)/nnue_test: dirs $(NNUE_OBJS)
 	$(LD) $(OPT) $(LDFLAGS) $(NNUE_OBJS) $(DEBUG) -o $(BUILD)/nnue_test $(NN_LIBS)
 
+$(EXPORT)/add_nn_version: dirs $(UTIL_OBJS)
+	$(LD) $(OPT) $(LDFLAGS) $(UTIL_OBJS) $(DEBUG) -o $(BUILD)/add_nn_version $(NN_LIBS)

@@ -1,5 +1,6 @@
 // Copyright 2021-2024 by Jon Dart. All Rights Reserved.
 #include "nnue.h"
+#include "../interface/chessint.h"
 
 #include <algorithm>
 #include <array>
@@ -14,10 +15,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include "../interface/chessint.h"
-#include "nndefs.h"
-#include "nnparams.h"
 
 // Unit tests for nnue code
 
