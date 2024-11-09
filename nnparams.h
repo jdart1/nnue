@@ -10,7 +10,7 @@ static constexpr unsigned OUTPUT_BUCKETS = 8;
 
 static constexpr unsigned BUCKET_DIVISOR = (32 + OUTPUT_BUCKETS - 1) / OUTPUT_BUCKETS;
 
-static constexpr unsigned HIDDEN_WIDTH = 1536;
+static constexpr unsigned HIDDEN_WIDTH = 1024;
 
 // input quantization, i.e. 0..1 in float domain is
 // 0 .. NETWORK_QA in integer domain.
@@ -34,7 +34,7 @@ static constexpr unsigned KING_BUCKETS_MAP[] = {
 // clang-format on
 
 // version of the network
-static constexpr uint32_t NN_VERSION = 0x68AE02B9u;
+static constexpr uint32_t NN_VERSION = 0xECEABF0Eu;
 
 };
 
