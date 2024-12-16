@@ -37,7 +37,7 @@ static inline vec_t vec_add32(vec_t x, const vec_t *y) { return _mm512_add_epi32
 static inline vec_t vec_add32(vec_t x, vec_t y) { return _mm512_add_epi32(x, y); }
 static inline vec_t vec_sub16(vec_t x, const vec_t *y) { return _mm512_sub_epi16(x, vec_load(y)); }
 static inline vec_t vec_sub32(vec_t x, const vec_t *y) { return _mm512_sub_epi32(x, vec_load(y)); }
-static inline vec_t vec_clamp(vec_t x, vec_t maxValues) { return _mm512_min_epi16(maxValues, _mm512_max_epi16(x, zero)) }
+static inline vec_t vec_clamp(vec_t x, vec_t maxValues) { return _mm512_min_epi16(maxValues, _mm512_max_epi16(x, zero)); }
 static inline vec_t vec_mullo16(vec_t x, vec_t y) { return _mm512_mullo_epi16(x, y); }
 static inline vec_t vec_madd16(vec_t x, vec_t y) { return _mm512_madd_epi16(x, y); }
 #elif defined(AVX2)
