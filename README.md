@@ -17,13 +17,13 @@ horizonally mirrored feature transformer layer, with king buckets,
 followed by a squared CRelU activation layer and then a single affine
 layer with buckets based on material count. All weights are
 16-bit integers. The key parameters of the network are specified in the file
-[code]nnparams.h[/code]. This architecture is similar to that of several other
+`nnparams.h`. This architecture is similar to that of several other
 strong chess engines including Obsidian, PlentyChess, Caissa, Virdithas, etc.
 
 The Arasan network was tuned with [bullet](https://github.com/jw1912/bullet).
 
 The quantized output from the bullet trainer is further processed by the program
-add_nn_version, available in the util subdirectory, which adds a 4-byte version
+`add_nn_version`, available in the util subdirectory, which adds a 4-byte version
 number to the start of the file. That version is validated by the network
 reading code at runtime.
 
