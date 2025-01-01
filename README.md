@@ -1,6 +1,31 @@
 # nnue
 
-This code provides an implementation of a [Efficiently Updatable Neural Network (NNUE)](https://www.chessprogramming.org/NNUE) for chess, compatible with the "[version 4](https://github.com/official-stockfish/Stockfish/commit/cb9c2594fcedc881ae8f8bfbfdf130cf89840e4c)" implementation in [Stockfish](https://github.com/official-stockfish/Stockfish). The original Stockfish NNUE was based on contributions from Hisayori Noda aka Nodchip. Later versions have been implemented primarily by Tomasz Sobczyk.
+This code provides an implementation of a [Efficiently Updatable
+Neural Network (NNUE)](https://www.chessprogramming.org/NNUE) for
+chess. Originally this was compatible with the "[version
+4](https://github.com/official-stockfish/Stockfish/commit/cb9c2594fcedc881ae8f8bfbfdf130cf89840e4c)"
+implementation in
+[Stockfish](https://github.com/official-stockfish/Stockfish), aka the
+"SFv4" architecture. The original Stockfish NNUE was based on
+contributions from Hisayori Noda aka Nodchip. Later versions have been
+implemented primarily by Tomasz Sobczyk.
+
+A Stockfish-compatible implementation is still available, in the
+"SFv4" branch. However, this branch implements a different NNUE
+architecture, used in Arasan 25.0. That architecture consists of a
+horizonally mirrored feature transformer layer, with king buckets,
+followed by a squared CRelU activation layer and then a single affine
+layer with buckets based on material count. All weights are
+16-bit integers. The key parameters of the network are specified in the file
+[code]nnparams.h[/code]. This architecture is similar to that of several other
+strong chess engines including Obsidian, PlentyChess, Caissa, Virdithas, etc.
+
+The Arasan network was tuned with [bullet](https://github.com/jw1912/bullet).
+
+The quantized output from the bullet trainer is further processed by the program
+add_nn_version, available in the util subdirectory, which adds a 4-byte version
+number to the start of the file. That version is validated by the network
+reading code at runtime.
 
 ## Copyright, license
 
