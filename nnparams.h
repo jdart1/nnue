@@ -4,7 +4,7 @@
 
 struct NetworkParams {
 
-static constexpr unsigned KING_BUCKETS = 9;
+static constexpr unsigned KING_BUCKETS = 13;
 
 static constexpr unsigned OUTPUT_BUCKETS = 8;
 
@@ -23,18 +23,19 @@ static constexpr int OUTPUT_SCALE = 400;
 
 // clang-format off
 static constexpr unsigned KING_BUCKETS_MAP[] = {
-    0, 1, 2, 3, 3, 2, 1, 0,
-    4, 4, 5, 5, 5, 5, 4, 4,
-    6, 6, 7, 7, 7, 7, 6, 6,
-    6, 6, 7, 7, 7, 7, 6, 6,
-    8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8};
+    // as in Obsidian
+    0,  1,  2,  3,  3,  2,  1,  0,
+    4,  5,  6,  7,  7,  6,  5,  4,
+    8,  8,  9,  9,  9,  9,  8,  8,
+    10, 10, 10, 10, 10, 10, 10, 10,
+    11, 11, 11, 11, 11, 11, 11, 11,
+    11, 11, 11, 11, 11, 11, 11, 11,
+    12, 12, 12, 12, 12, 12, 12, 12,
+    12, 12, 12, 12, 12, 12, 12, 12};
 // clang-format on
 
 // version of the network
-static constexpr uint32_t NN_VERSION = 0xECEABF0Eu;
+static constexpr uint32_t NN_VERSION = 0x7c802d9au;
 
 };
 
