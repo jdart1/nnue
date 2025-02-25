@@ -82,13 +82,12 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
         max_weights.fill(-(1<<30));
         max_biases.fill(-(1<<30));
 #endif
-        // bullet format. Weights are in a matrix ordered with 1st
-        // dimension weights, 2nd dimension buckets. We want 1st
-        // dimension buckets, 2nd dimention weights for computational
-        // efficiency. So do that transformation here.
-        for (size_t i = 0; i < inputSize && s.good(); ++i) {
-            for (size_t b = 0; b < buckets; ++b) {
-                // TBD: bullet format for outputSize > 1?
+        // bullet format. Weights are in a matrix ordered by buckets.ordered with 1st
+        // (This is the "new" format: formerly the storage was weights x buckets, now
+        // it's buckets x weights).
+        for (size_t b = 0; b < buckets; ++b) {
+            for (size_t i = 0; i < inputSize && s.good(); ++i) {
+                // TBD: is this correct bullet format for outputSize > 1?
                 for (size_t j = 0; j < outputSize && s.good(); ++j) {
                     _weights[b][j][i] = read_little_endian<WeightType>(s);
 #ifdef NNUE_TRACE
@@ -100,9 +99,8 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
                 }
             }
         }
-        // similarly, biases are stored as outputSize x buckets
-        for (size_t i = 0; i < outputSize && s.good(); ++i) {
-            for (size_t b = 0; b < buckets; ++b) {
+        for (size_t b = 0; b < buckets; ++b) {
+            for (size_t i = 0; i < outputSize && s.good(); ++i) {
                 _biases[b][i] = read_little_endian<BiasType>(s);
 #ifdef NNUE_TRACE
                 if (_biases[b][i] < min_biases[b])
