@@ -82,19 +82,18 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
         max_weights.fill(-(1<<30));
         max_biases.fill(-(1<<30));
 #endif
-        // bullet format. Weights are in a matrix ordered by buckets.ordered with 1st
+        // bullet format. Weights are in a matrix ordered by buckets.
         // (This is the "new" format: formerly the storage was weights x buckets, now
         // it's buckets x weights).
         for (size_t b = 0; b < buckets; ++b) {
-            for (size_t i = 0; i < inputSize && s.good(); ++i) {
-                // TBD: is this correct bullet format for outputSize > 1?
-                for (size_t j = 0; j < outputSize && s.good(); ++j) {
-                    _weights[b][j][i] = read_little_endian<WeightType>(s);
+            for (size_t i = 0; i < outputSize && s.good(); ++i) {
+                for (size_t j = 0; j < inputSize && s.good(); ++j) {
+                    _weights[b][i][j] = read_little_endian<WeightType>(s);
 #ifdef NNUE_TRACE
-                    if (_weights[b][j][i] < min_weights[b])
-                        min_weights[b] = _weights[b][j][i];
-                    if (_weights[b][j][i] > max_weights[b])
-                        max_weights[b] = _weights[b][j][i];
+                    if (_weights[b][i][j] < min_weights[b])
+                        min_weights[b] = _weights[b][i][j];
+                    if (_weights[b][i][j] > max_weights[b])
+                        max_weights[b] = _weights[b][i][j];
 #endif
                 }
             }
