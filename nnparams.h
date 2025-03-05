@@ -4,13 +4,13 @@
 
 struct NetworkParams {
 
-static constexpr unsigned KING_BUCKETS = 16;
+static constexpr unsigned KING_BUCKETS = 9;
 
 static constexpr unsigned OUTPUT_BUCKETS = 8;
 
 static constexpr unsigned BUCKET_DIVISOR = (32 + OUTPUT_BUCKETS - 1) / OUTPUT_BUCKETS;
 
-static constexpr unsigned HIDDEN_WIDTH = 1024;
+static constexpr unsigned HIDDEN_WIDTH = 1536;
 
 // input quantization, i.e. 0..1 in float domain is
 // 0 .. NETWORK_QA in integer domain.
@@ -23,15 +23,14 @@ static constexpr int OUTPUT_SCALE = 400;
 
 // clang-format off
 static constexpr unsigned KING_BUCKETS_MAP[] = {
-    // as in Alexandria
-    0,  1,  2,  3,  3,  2,  1,  0,
-    4,  5,  6,  7,  7,  6,  5,  4,
-    8,  9, 10, 11, 11, 10,  9,  8,
-    8,  9, 10, 11, 11, 10,  9,  8,
-    12, 12, 13, 13, 13, 13, 12, 12,
-    12, 12, 13, 13, 13, 13, 12, 12,
-    14, 14, 15, 15, 15, 15, 14, 14,
-    14, 14, 15, 15, 15, 15, 14, 14};
+    0, 1, 2, 3, 3, 2, 1, 0,
+    4, 4, 5, 5, 5, 5, 4, 4,
+    6, 6, 7, 7, 7, 7, 6, 6,
+    6, 6, 7, 7, 7, 7, 6, 6,
+    8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8};
 // clang-format on
 
 static inline unsigned getOutputBucket(unsigned pieceCount) {
