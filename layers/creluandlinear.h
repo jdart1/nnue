@@ -1,4 +1,4 @@
-// Copyright 2024 by Jon Dart. All Rights Reserved
+// Copyright 2024-2025 by Jon Dart. All Rights Reserved
 #ifndef _NNUE_CRELUANDLINEAR_H
 #define _NNUE_CRELUANDLINEAR_H
 
@@ -7,9 +7,9 @@
 // This combines both a CReLU operation and a linear layer with output size one, the (single) hidden layer
 // in the Arasan V3 architecture.
 template <typename AccumulatorType, typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
-          int clampMax, int NETWORK_QA, size_t buckets, size_t alignment = DEFAULT_ALIGN>
+          int clampMax, int NETWORK_QA, size_t buckets, bool transpose = false, size_t alignment = DEFAULT_ALIGN>
 class CReLUAndLinear
-    : public LinearLayer<InputType, WeightType, BiasType, OutputType, inputSize, 1, buckets, alignment> {
+    : public LinearLayer<InputType, WeightType, BiasType, OutputType, inputSize, 1, buckets, transpose, alignment> {
   public:
     CReLUAndLinear() = default;
 
