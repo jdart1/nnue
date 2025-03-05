@@ -25,9 +25,10 @@ class Network {
         NetworkParams::HIDDEN_WIDTH, NetworkParams::KING_BUCKETS_MAP>;
     using AccumulatorType = FeatureXformer::AccumulatorType;
     using AccumulatorOutputType = int16_t;
-    using OutputLayer = SqrCReLUAndLinear<AccumulatorType, int16_t, int16_t, int16_t, OutputType,
-                                          NetworkParams::HIDDEN_WIDTH * 2, NetworkParams::NETWORK_QA,
-                                          NetworkParams::NETWORK_QA, NetworkParams::OUTPUT_BUCKETS, true>;
+    using OutputLayer =
+        SqrCReLUAndLinear<AccumulatorType, int16_t, int16_t, int16_t, OutputType,
+                          NetworkParams::HIDDEN_WIDTH * 2, NetworkParams::NETWORK_QA,
+                          NetworkParams::NETWORK_QA, NetworkParams::OUTPUT_BUCKETS, true, true>;
 
     static constexpr size_t BUFFER_SIZE = 4096;
 
