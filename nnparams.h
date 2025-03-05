@@ -1,4 +1,4 @@
-// Copyright 2024 by Jon Dart. All Rights Reserved
+// Copyright 2024-2025 by Jon Dart. All Rights Reserved
 #ifndef _NETWORK_PARAMS
 #define _NETWORK_PARAMS
 
@@ -32,6 +32,10 @@ static constexpr unsigned KING_BUCKETS_MAP[] = {
     8, 8, 8, 8, 8, 8, 8, 8,
     8, 8, 8, 8, 8, 8, 8, 8};
 // clang-format on
+
+static inline unsigned getOutputBucket(unsigned pieceCount) {
+    return (pieceCount - 2) / BUCKET_DIVISOR;
+}
 
 // version of the network
 static constexpr uint32_t NN_VERSION = 0xECEABF0Eu;

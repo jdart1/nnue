@@ -1,6 +1,8 @@
-// Copyright 2021-2024 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2025 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_EVALUATE_H
 #define _NNUE_EVALUATE_H
+
+#include "nnparams.h"
 
 template <typename ChessInterface> class Evaluator {
 public:
@@ -155,8 +157,7 @@ public:
     }
 
     static unsigned getOutputBucket(const ChessInterface &intf) {
-        // range is 0..7
-        return (intf.pieceCount() - 2)/NetworkParams::BUCKET_DIVISOR;
+        return NetworkParams::getOutputBucket(intf.pieceCount());
     }
 
     // full evaluation of accumulator, update into 3rd argument

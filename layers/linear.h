@@ -1,4 +1,4 @@
-// Copyright 2021-2022, 2024 by Jon Dart. All Rights Reserved.
+// Copyright 2021-2022, 2024-2025 by Jon Dart. All Rights Reserved.
 #ifndef _NNUE_LINEAR_H
 #define _NNUE_LINEAR_H
 
@@ -9,9 +9,10 @@
 #endif
 
 // This class defines a linear transformation layer of the NNUE.
+// If transpose == true, correct the input data format so that it is ordered by buckets.
 //
 template <typename InputType, typename WeightType, typename BiasType, typename OutputType,
-          size_t inputSize, size_t outputSize, size_t buckets, size_t alignment = DEFAULT_ALIGN>
+          size_t inputSize, size_t outputSize, size_t buckets, bool transpose = false, size_t alignment = DEFAULT_ALIGN>
 class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSize, alignment> {
 
     static constexpr size_t roundedInputSize = std::max<size_t>(32, inputSize);
@@ -73,56 +74,82 @@ class LinearLayer : public TypedLayer<InputType, OutputType, inputSize, outputSi
 
     virtual std::istream &read(std::istream &s) {
 #ifdef NNUE_TRACE
-        std::array<int,buckets> min_weights;
-        std::array<int,buckets> max_weights;
-        std::array<int,buckets> min_biases;
-        std::array<int,buckets> max_biases;
-        min_weights.fill(1<<30);
-        min_biases.fill(1<<30);
-        max_weights.fill(-(1<<30));
-        max_biases.fill(-(1<<30));
+        std::array<int, buckets> min_weights;
+        std::array<int, buckets> max_weights;
+        std::array<int, buckets> min_biases;
+        std::array<int, buckets> max_biases;
+        min_weights.fill(1 << 30);
+        min_biases.fill(1 << 30);
+        max_weights.fill(-(1 << 30));
+        max_biases.fill(-(1 << 30));
 #endif
-        // bullet format. Weights are in a matrix ordered by buckets.
-        // (This is the "new" format: formerly the storage was weights x buckets, now
-        // it's buckets x weights).
-        for (size_t b = 0; b < buckets; ++b) {
-            for (size_t i = 0; i < outputSize && s.good(); ++i) {
-                for (size_t j = 0; j < inputSize && s.good(); ++j) {
-                    _weights[b][i][j] = read_little_endian<WeightType>(s);
+        if constexpr (transpose) {
+            // bullet format. Weights are in a matrix ordered with 1st
+            // dimension weights, 2nd dimension buckets. We want 1st
+            // dimension buckets, 2nd dimension weights for computational
+            // efficiency. So do that transformation here.
+            for (size_t i = 0; i < inputSize && s.good(); ++i) {
+                for (size_t b = 0; b < buckets; ++b) {
+                    for (size_t j = 0; j < outputSize && s.good(); ++j) {
+                        _weights[b][j][i] = read_little_endian<WeightType>(s);
 #ifdef NNUE_TRACE
-                    if (_weights[b][i][j] < min_weights[b])
-                        min_weights[b] = _weights[b][i][j];
-                    if (_weights[b][i][j] > max_weights[b])
-                        max_weights[b] = _weights[b][i][j];
+                        if (_weights[b][j][i] < min_weights[b])
+                            min_weights[b] = _weights[b][j][i];
+                        if (_weights[b][j][i] > max_weights[b])
+                            max_weights[b] = _weights[b][j][i];
 #endif
+                    }
                 }
             }
-        }
-        for (size_t b = 0; b < buckets; ++b) {
+            // similarly, biases are stored as outputSize x buckets
             for (size_t i = 0; i < outputSize && s.good(); ++i) {
-                _biases[b][i] = read_little_endian<BiasType>(s);
+                for (size_t b = 0; b < buckets; ++b) {
+                    _biases[b][i] = read_little_endian<BiasType>(s);
+                }
+            }
+        } else {
+            // This is the "new" bullet format, ordered by buckets
+            for (size_t b = 0; b < buckets; ++b) {
+                for (size_t i = 0; i < outputSize && s.good(); ++i) {
+                    for (size_t j = 0; j < inputSize && s.good(); ++j) {
+                        _weights[b][i][j] = read_little_endian<WeightType>(s);
 #ifdef NNUE_TRACE
-                if (_biases[b][i] < min_biases[b])
-                    min_biases[b] = _biases[b][i];
-                if (_biases[b][i] > max_biases[b])
-                    max_biases[b] = _biases[b][i];
+                        if (_weights[b][i][j] < min_weights[b])
+                            min_weights[b] = _weights[b][i][j];
+                        if (_weights[b][i][j] > max_weights[b])
+                            max_weights[b] = _weights[b][i][j];
 #endif
+                    }
+                }
+            }
+            for (size_t b = 0; b < buckets; ++b) {
+                for (size_t i = 0; i < outputSize && s.good(); ++i) {
+                    _biases[b][i] = read_little_endian<BiasType>(s);
+#ifdef NNUE_TRACE
+                    if (_biases[b][i] < min_biases[b])
+                        min_biases[b] = _biases[b][i];
+                    if (_biases[b][i] > max_biases[b])
+                        max_biases[b] = _biases[b][i];
+#endif
+                }
             }
         }
 #ifdef NNUE_TRACE
         if (!s.fail()) {
             std::cout << "linear layer stats by bucket" << std::endl;
             for (size_t b = 0; b < buckets; ++b) {
-                std::cout << b << ": " << "min weight = " << min_weights[b]
-                          << " max weight = " << max_weights[b] << " min bias = " << min_biases[b]
-                          << " max bias = " << max_biases[b] << std::endl;
+                std::cout << b << ": "
+                          << "min weight = " << min_weights[b] << " max weight = " << max_weights[b]
+                          << " min bias = " << min_biases[b] << " max bias = " << max_biases[b]
+                          << std::endl;
             }
         }
 #endif
         return s;
     }
 
-    virtual std::ostream &write(std::ostream &s, const WeightType (&weights)[buckets][outputSize][roundedInputSize],
+    virtual std::ostream &write(std::ostream &s,
+                                const WeightType (&weights)[buckets][outputSize][roundedInputSize],
                                 const BiasType (&biases)[buckets][outputSize]) {
         // Weights first, then biases
         // serialized in column order

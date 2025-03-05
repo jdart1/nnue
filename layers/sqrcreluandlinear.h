@@ -11,9 +11,9 @@
 // If saturate = false, the input is just squared, asssuming no saturation. This will be true if the inputs are
 // clamped to <=181 = square root of 32768.
 template <typename AccumulatorType, typename InputType, typename WeightType, typename BiasType, typename OutputType, size_t inputSize,
-          int clampMax, int NETWORK_QA, size_t buckets, bool saturate, size_t alignment = DEFAULT_ALIGN>
+          int clampMax, int NETWORK_QA, size_t buckets, bool saturate, bool transpose = false, size_t alignment = DEFAULT_ALIGN>
 class SqrCReLUAndLinear
-    : public LinearLayer<InputType, WeightType, BiasType, OutputType, inputSize, 1, buckets, alignment> {
+    : public LinearLayer<InputType, WeightType, BiasType, OutputType, inputSize, 1, buckets, transpose, alignment> {
   public:
     SqrCReLUAndLinear() = default;
 
@@ -66,6 +66,7 @@ class SqrCReLUAndLinear
             output[0] = (sum / NETWORK_QA) + this->_biases[bucket][0];
         }
 #ifdef NNUE_TRACE
+        std::cout << "output bucket = " << bucket << std::endl;
         std::cout << "---- SqrCReLUAndLinear output " << std::endl;
         std::cout << " prescaled = " << sum << " unsquared = " << output[0] << std::endl;
         for (size_t i = 0; i < 1 /*outputSize */; ++i) {
